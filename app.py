@@ -2,15 +2,16 @@ import json
 import requests
 import csv
 import qrcode
-import sys
 import argparse
 import mimetypes
+import math
 from PIL import Image
 from PIL import ImageDraw
-import math
 from PIL import ImageFont
+
 API_url = "https://i-tw.org/twpay/api"
-def call_API(BankID,Account,offline):
+
+def call_API(BankID,Account,offline,verbose):
     if offline:
         ret = offline_genstr(BankID, Account)
         return ret
@@ -19,10 +20,12 @@ def call_API(BankID,Account,offline):
     if r.status_code != 200:
         raise ("Failed to generate code with input:",my_params)
     response = r.json()
+    if verbose:
+        print(response)
     if response["Success"] != '1':
         raise RuntimeError("Failed to generate code with input:",my_params)
-    #print(response)
     return response['String']
+
 def gencode(data_str,name,BankID,Account):
     qr = qrcode.QRCode(
     version=1,
@@ -45,6 +48,7 @@ def gencode(data_str,name,BankID,Account):
     t_w, t_h = draw.textsize(description, cjk_font)
     draw.text(((output_width - t_w) / 2,output_height-50),description,(0,0,0),font=cjk_font)
     newImg.save(name+".png")
+
 def prepare_BICList():
     ret = dict()
     biccsv = "data/BIC.csv"
@@ -56,30 +60,35 @@ def prepare_BICList():
         for row in rows:
             ret[row["BIC"]] = row["Name"]
     return ret
+
 def offline_genstr(BankID,Account):
     Account = Account.strip()  
     AccountLength = len(Account) - 1
     if AccountLength > 16:
         raise RuntimeError("Account Length is greater than 16")
-      
     Account = Account.zfill(16)
-    print(Account)
     ret = 'TWQRP://'+BankID+'NTTransfer/158/02/V1?D6='+Account+'&D5='+BankID+'&D10=901'
     return ret   
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("inputFile",type=str,help="Input File")
     parser.add_argument("--offline",action="store_true",help="Offline mode")
+    parser.add_argument("-v","--verbose",action="store_true",help="Verbose mode")    
     args = parser.parse_args()
     offline = args.offline
-    file_type,file_encoding = mimetypes.guess_type(args.inputFile)
+    verbose = args.verbose
+    inputFile = args.inputFile
+    file_type,file_encoding = mimetypes.guess_type(inputFile)
     if file_type != "text/csv":   
         raise RuntimeError("Input is not csv file")
     BIC_List = prepare_BICList()
 
-    with open(sys.argv[1],newline='') as csvfile:
+    with open(inputFile,newline='') as csvfile:
         rows = csv.DictReader(csvfile)
         for row in rows:
                 if row["BankID"] in BIC_List:          
-                    data_str = call_API(row["BankID"],row["Account"],offline)
+                    data_str = call_API(row["BankID"],row["Account"],offline,verbose)
+                    if verbose:
+                        print(data_str)
                     gencode(data_str,BIC_List[row["BankID"]],row["BankID"],row["Account"])
