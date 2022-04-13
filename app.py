@@ -39,18 +39,27 @@ def call_API(name,BankID,Account):
     t_w, t_h = draw.textsize(description, cjk_font)
     draw.text(((output_width - t_w) / 2,output_height-50),description,(0,0,0),font=cjk_font)
     newImg.save(name+".png")
+def prepare_BICList():
+    ret = dict()
+    with open("data/BIC.csv") as biclist:
+        rows = csv.DictReader(biclist) 
+        for row in rows:
+            ret[row["BIC"]] = row["Name"]
+    return ret
 def offline_gen(name,BankID,Account):
     #TBD
     exit()    
 if __name__ == '__main__':
-
     if len(sys.argv) != 2:
         print("Usage: python app.py [csv-file]")
         exit()
     file_type,file_encoding = mimetypes.guess_type(sys.argv[1])
     if file_type != "text/csv":   
         raise RuntimeError("Input is not csv file")
+    BIC_List = prepare_BICList()
+
     with open(sys.argv[1],newline='') as csvfile:
         rows = csv.DictReader(csvfile)
         for row in rows:
-            call_API(row["Name"],row["BankID"],row["Account"])
+                if row["BankID"] in BIC_List:
+                    call_API(BIC_List[row["BankID"]],row["BankID"],row["Account"])
