@@ -57,6 +57,13 @@ def prepare_BICList():
             ret[row["BIC"]] = row["Name"]
     return ret
 def offline_genstr(BankID,Account):
+    Account = Account.strip()  
+    AccountLength = len(Account) - 1
+    if AccountLength > 16:
+        raise RuntimeError("Account Length is greater than 16")
+      
+    Account = Account.zfill(16)
+    print(Account)
     ret = 'TWQRP://'+BankID+'NTTransfer/158/02/V1?D6='+Account+'&D5='+BankID+'&D10=901'
     return ret   
 if __name__ == '__main__':
