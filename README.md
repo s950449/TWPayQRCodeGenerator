@@ -5,9 +5,9 @@
 * 目前只支援銀行代號(Bank)以及帳戶號碼(Acc)，不支援收款金額設定及備註等功能
 * 在QRCode下方加入金融機構名稱以及帳戶號碼，方便辨識
     * 使用Noto Sans CJK字體
-    * [金融機構代碼對照來源] (https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv)
+    * [金融機構代碼對照來源](https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv)
 ## 使用
-* (建議使用)線上版：使用 https://github.com/jefflin555/twpay 的 API，連線到 https://i-tw.org/twpay/api，並使用Python的QRCode library產生QRCode
+* (建議使用)線上版：使用 https://github.com/jefflin555/twpay 的 API，連線到 https://i-tw.org/twpay/api ，並使用Python的QRCode library產生QRCode
     * 執行
         `python app.py [csv-file]`
 * (測試中)離線版:
