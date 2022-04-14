@@ -26,7 +26,7 @@ def call_API(BankID,Account,offline,verbose):
         raise RuntimeError("Failed to generate code with input:",my_params)
     return response['String']
 
-def gencode(data_str,name,BankID,Account):
+def gencode(data_str,name,BankName,BankID,Account):
     qr = qrcode.QRCode(
     version=1,
     error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -43,7 +43,7 @@ def gencode(data_str,name,BankID,Account):
     newImg = Image.new("RGB",(output_width,output_height),(255,255,255))
     newImg.paste(img,(x1,y1,x1+width,y1+height))
     draw = ImageDraw.Draw(newImg)
-    description = name+' ('+BankID+') '+Account
+    description = BankName+' ('+BankID+') '+Account
     cjk_font = ImageFont.FreeTypeFont("fonts/NotoSansCJKtc-Light.otf",size=24)
     t_w, t_h = draw.textsize(description, cjk_font)
     draw.text(((output_width - t_w) / 2,output_height-50),description,(0,0,0),font=cjk_font)
@@ -91,4 +91,4 @@ if __name__ == '__main__':
                     data_str = call_API(row["BankID"],row["Account"],offline,verbose)
                     if verbose:
                         print(data_str)
-                    gencode(data_str,BIC_List[row["BankID"]],row["BankID"],row["Account"])
+                    gencode(data_str,row["Name"],BIC_List[row["BankID"]],row["BankID"],row["Account"])
