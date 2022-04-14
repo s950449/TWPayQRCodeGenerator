@@ -6,6 +6,8 @@
 * 在QRCode下方加入金融機構名稱以及帳戶號碼，方便辨識
     * 使用Noto Sans CJK字體
     * [金融機構代碼對照來源](https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv)
+## 所需環境
+* 使用`pip install -r requirements.txt`或是`pipenv install`安裝所需的Library
 ## 使用
 * (建議使用)線上版：使用 https://github.com/jefflin555/twpay 的 API，連線到 https://i-tw.org/twpay/api ，並使用Python的QRCode library產生QRCode
     * 執行
