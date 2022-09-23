@@ -45,7 +45,7 @@ def gencode(data_str,name,BankName,BankID,Account):
     draw = ImageDraw.Draw(newImg)
     description = BankName+' ('+BankID+') '+Account
     cjk_font = ImageFont.FreeTypeFont("fonts/NotoSansCJKtc-Light.otf",size=24)
-    t_w, t_h = draw.textsize(description, cjk_font)
+    t_w = draw.textlength(description, cjk_font)
     draw.text(((output_width - t_w) / 2,output_height-50),description,(0,0,0),font=cjk_font)
     newImg.save(name+".png")
 
