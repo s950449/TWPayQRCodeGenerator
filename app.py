@@ -10,16 +10,33 @@ from PIL import ImageDraw
 from PIL import ImageFont
 
 API_url = "https://i-tw.org/twpay/api"
-
-def call_API(BankID,Account,offline,verbose):
+AMOUNT_MAX = 9999999999999999
+def call_API(BankID,Account,offline,verbose,Amount,Msg):
+    amount_flag = False
+    if Msg != None:
+        if len(Msg)<0 or len(Msg)>=20:
+            raise RuntimeError("Message length is not in range")
+    else:
+        Msg =''
+    if Amount != None: 
+        Amount = int(Amount)
+        if Amount >= 1 and Amount <= AMOUNT_MAX:
+            amount_flag = True
     if offline:
-        ret = offline_genstr(BankID, Account)
+        ret = offline_genstr(BankID, Account,Amount,amount_flag,Msg)
         return ret
-    my_params = {"Bank": BankID,"Acc": Account}
+    my_params = {"Bank": BankID,"Acc": Account,"Msg": Msg}
+    if amount_flag:
+        my_params["Amount"] = Amount
     r = requests.get(API_url,params = my_params)
     if r.status_code != 200:
         raise ("Failed to generate code with input:",my_params)
-    response = r.json()
+    try:
+        response = r.json()
+    except:
+        print("Failed to parse json response, switch to offline mode")
+        ret = offline_genstr(BankID, Account,Amount,amount_flag,Msg)
+        return ret
     if verbose:
         print(response)
     if response["Success"] != '1':
@@ -61,13 +78,16 @@ def prepare_BICList():
             ret[row["BIC"]] = row["Name"]
     return ret
 
-def offline_genstr(BankID,Account):
+def offline_genstr(BankID,Account,Amount,amount_flag=False,Msg=''):
     Account = Account.strip()  
     AccountLength = len(Account) - 1
     if AccountLength > 16:
         raise RuntimeError("Account Length is greater than 16")
     Account = Account.zfill(16)
     ret = 'TWQRP://'+BankID+'NTTransfer/158/02/V1?D6='+Account+'&D5='+BankID+'&D10=901'
+    if amount_flag:
+        ret += '&D1=' + str(Amount)+'00'
+    ret = ret +'&D9='+Msg
     return ret   
 
 if __name__ == '__main__':
@@ -87,8 +107,12 @@ if __name__ == '__main__':
     with open(inputFile,newline='') as csvfile:
         rows = csv.DictReader(csvfile)
         for row in rows:
-                if row["BankID"] in BIC_List:          
-                    data_str = call_API(row["BankID"],row["Account"],offline,verbose)
+                if row["BankID"] in BIC_List:
+                    if 'Amount' not in row:
+                        row["Amount"] = None
+                    if 'Msg' not in row:
+                        row["Msg"] = None
+                    data_str = call_API(row["BankID"],row["Account"],offline,verbose,row["Amount"],row["Msg"])
                     if verbose:
                         print(data_str)
                     gencode(data_str,row["Name"],BIC_List[row["BankID"]],row["BankID"],row["Account"])
