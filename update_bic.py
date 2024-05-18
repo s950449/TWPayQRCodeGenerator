@@ -11,10 +11,9 @@ if __name__ == "__main__":
     output = dict()
     with open(CSV_FILE,'r',encoding='utf-8-sig') as csvfile:
         rows = csv.DictReader(csvfile)
-        output
         for row in rows:
             if row["業務別"] == '跨行自動化服務機器業務(金融卡)':
-                output[row['銀行代號/BIC']] = row['金融機構名稱']
+                output[row['銀行代號/BIC/總機構代碼']] = row['金融機構名稱']
     with open(CSV_FILE,'w') as csvfile:                
         writer = csv.DictWriter(csvfile,fieldnames=['BIC','Name'])
         writer.writeheader()
