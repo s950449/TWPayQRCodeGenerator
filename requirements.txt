@@ -4,5 +4,5 @@ charset-normalizer==2.0.12
 idna==3.3
 pillow==10.3.0
 qrcode==7.3.1
-requests==2.27.1
+requests==2.32.4
 urllib3==2.6.0
