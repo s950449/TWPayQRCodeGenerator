@@ -5,4 +5,4 @@ idna==3.3
 pillow==10.2.0
 qrcode==7.3.1
 requests==2.27.1
-urllib3==1.26.19
+urllib3==2.6.0
