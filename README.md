@@ -1,17 +1,20 @@
-# 台灣Pay產生器API(J大產生器) Python client
+# 台灣Pay產生器API(J大產生器) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 線上版
+## 線上版 (Vibe Coding w/Claude Opus 4.5, Javascript)
 直接在瀏覽器使用，無需安裝：**[線上版 QR Code 產生器](https://s950449.github.io/TWPayQRCodeGenerator/)**
 
 ## 功能
-* 目前只支援銀行代號(Bank)以及帳戶號碼(Acc)，不支援收款金額設定及備註等功能
+* 支援銀行代號(Bank)以及帳戶號碼(Acc)及收款金額設定
 * 在QRCode下方加入金融機構名稱以及帳戶號碼，方便辨識
     * 使用Noto Sans CJK字體
     * [金融機構代碼對照來源](https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv)
 ## 所需環境
+### Python Client
 * 使用`pip install -r requirements.txt`或是`pipenv install`安裝所需的Library
-## 使用
+### 靜態網頁
+* 使用一個Web Server或瀏覽器
+## Python Client使用
 * (建議使用)線上版：使用 https://github.com/jefflin555/twpay 的 API，連線到 https://i-tw.org/twpay/api ，並使用Python的QRCode library產生QRCode
     * 執行
         `python app.py [csv-file]`
