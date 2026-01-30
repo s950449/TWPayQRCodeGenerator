@@ -346,6 +346,66 @@ footer a:hover {
   background: #dc2626;
 }
 
+/* ===== Mode Tabs ===== */
+.mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.mode-tab:hover {
+  color: #333;
+}
+
+.mode-tab.active {
+  background: #1a3a5c;
+  color: #fff;
+}
+
+/* ===== Fee Hint ===== */
+.fee-hint {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  color: #666;
+  line-height: 1.5;
+  background: #f8f9fa;
+  border-left: 3px solid #2563eb;
+  padding: 8px 12px;
+  border-radius: 0 6px 6px 0;
+}
+
+/* ===== Fee Service Fee ===== */
+.fee-service-fee {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.fee-service-fee.free {
+  color: #16a34a;
+}
+
+.fee-service-fee.charged {
+  color: #dc2626;
+}
+
 /* ===== Hidden Utility ===== */
 .hidden {
   display: none !important;

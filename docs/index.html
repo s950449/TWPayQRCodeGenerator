@@ -22,10 +22,15 @@
     <section class="card" id="single-section">
       <h2>單筆產生</h2>
 
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" data-mode="transfer">轉帳</button>
+        <button type="button" class="mode-tab" data-mode="bill">繳費</button>
+      </div>
+
       <div class="error-msg" id="error-msg"></div>
 
       <form id="qr-form" autocomplete="off">
-        <div class="form-group">
+        <div class="form-group transfer-only">
           <label for="saved-select">常用帳號</label>
           <div class="saved-row">
             <select id="saved-select">
@@ -35,11 +40,20 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group transfer-only">
           <label for="bank-select">金融機構</label>
           <select id="bank-select" required>
             <option value="">-- 請選擇金融機構 --</option>
           </select>
+        </div>
+
+        <div class="form-group bill-only hidden" id="fee-group">
+          <label for="fee-select">繳費類別</label>
+          <select id="fee-select">
+            <option value="">-- 請選擇繳費類別 --</option>
+          </select>
+          <p class="fee-hint hidden" id="fee-hint"></p>
+          <p class="fee-service-fee hidden" id="fee-service-fee"></p>
         </div>
 
         <div class="form-group">
@@ -48,7 +62,7 @@
         </div>
 
         <div class="form-group">
-          <label for="amount-input">金額 <span class="optional">（選填）</span></label>
+          <label for="amount-input" id="amount-label">金額 <span class="optional">（選填）</span></label>
           <input type="number" id="amount-input" min="1" max="9999999999999999" placeholder="不填則不指定金額">
         </div>
 

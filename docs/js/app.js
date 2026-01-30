@@ -28,6 +28,17 @@ var savedSelect = document.getElementById("saved-select");
 var savedDeleteBtn = document.getElementById("saved-delete-btn");
 var saveAccountBtn = document.getElementById("save-account-btn");
 
+var feeSelect = document.getElementById("fee-select");
+var feeGroup = document.getElementById("fee-group");
+var feeHint = document.getElementById("fee-hint");
+var feeServiceFee = document.getElementById("fee-service-fee");
+var amountLabel = document.getElementById("amount-label");
+var modeTabs = document.querySelectorAll(".mode-tab");
+var transferOnlyEls = document.querySelectorAll(".transfer-only");
+var billOnlyEls = document.querySelectorAll(".bill-only");
+
+var currentMode = "transfer";
+
 var batchHeader = document.getElementById("batch-header");
 var batchBody = document.getElementById("batch-body");
 var fileDrop = document.getElementById("file-drop");
@@ -126,6 +137,100 @@ savedDeleteBtn.addEventListener("click", function () {
 
 renderSavedSelect();
 
+// ===== Initialize Fee Select =====
+function initFeeSelect() {
+  var groups = {};
+  TWQRP_FEE_LIST.forEach(function (item) {
+    if (!groups[item.group]) {
+      groups[item.group] = [];
+    }
+    groups[item.group].push(item);
+  });
+
+  Object.keys(groups).forEach(function (groupName) {
+    var optgroup = document.createElement("optgroup");
+    optgroup.label = groupName;
+    groups[groupName].forEach(function (item) {
+      var opt = document.createElement("option");
+      opt.value = item.code;
+      opt.textContent = item.code.replace(/[A-Z]$/, "") + " " + item.label;
+      optgroup.appendChild(opt);
+    });
+    feeSelect.appendChild(optgroup);
+  });
+}
+
+initFeeSelect();
+
+feeSelect.addEventListener("change", function () {
+  var code = feeSelect.value;
+  var item = code ? TWQRP_FEE_LIST.find(function (f) { return f.code === code; }) : null;
+  if (item && item.hint) {
+    feeHint.textContent = item.hint;
+    feeHint.classList.remove("hidden");
+  } else {
+    feeHint.textContent = "";
+    feeHint.classList.add("hidden");
+  }
+  if (item) {
+    feeServiceFee.classList.remove("hidden", "free", "charged");
+    if (item.serviceFee > 0) {
+      feeServiceFee.textContent = "手續費：" + item.serviceFee + " 元";
+      feeServiceFee.classList.add("charged");
+    } else {
+      feeServiceFee.textContent = "免手續費";
+      feeServiceFee.classList.add("free");
+    }
+  } else {
+    feeServiceFee.textContent = "";
+    feeServiceFee.classList.add("hidden");
+    feeServiceFee.classList.remove("free", "charged");
+  }
+});
+
+// ===== Mode Switching =====
+modeTabs.forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    var mode = tab.getAttribute("data-mode");
+    if (mode === currentMode) return;
+    currentMode = mode;
+
+    // Toggle active tab
+    modeTabs.forEach(function (t) { t.classList.remove("active"); });
+    tab.classList.add("active");
+
+    // Toggle visibility
+    if (mode === "bill") {
+      transferOnlyEls.forEach(function (el) { el.classList.add("hidden"); });
+      billOnlyEls.forEach(function (el) { el.classList.remove("hidden"); });
+      bankSelect.removeAttribute("required");
+      amountInput.setAttribute("required", "");
+      amountLabel.innerHTML = '金額';
+      accountInput.placeholder = "請輸入繳費帳號";
+      saveAccountBtn.classList.add("hidden");
+    } else {
+      transferOnlyEls.forEach(function (el) { el.classList.remove("hidden"); });
+      billOnlyEls.forEach(function (el) { el.classList.add("hidden"); });
+      bankSelect.setAttribute("required", "");
+      amountInput.removeAttribute("required");
+      amountLabel.innerHTML = '金額 <span class="optional">（選填）</span>';
+      accountInput.placeholder = "請輸入帳號";
+      saveAccountBtn.classList.remove("hidden");
+    }
+
+    // Reset form & result
+    qrForm.reset();
+    renderSavedSelect();
+    feeHint.textContent = "";
+    feeHint.classList.add("hidden");
+    feeServiceFee.textContent = "";
+    feeServiceFee.classList.add("hidden");
+    feeServiceFee.classList.remove("free", "charged");
+    hideError();
+    resultArea.classList.add("hidden");
+  });
+});
+
 // ===== Error Display =====
 function showError(msg) {
   errorMsg.textContent = msg;
@@ -192,26 +297,52 @@ qrForm.addEventListener("submit", function (e) {
   hideError();
   resultArea.classList.add("hidden");
 
-  var bankId = bankSelect.value;
   var account = accountInput.value;
   var amount = amountInput.value || null;
   var msg = msgInput.value || null;
-
-  if (!bankId) {
-    showError("請選擇金融機構");
-    return;
-  }
-
   var dataStr;
-  try {
-    dataStr = twqrpEncode(bankId, account, amount, msg);
-  } catch (err) {
-    showError(err.message);
-    return;
-  }
+  var description;
 
-  var bankName = bicMap[bankId] || bankId;
-  var description = bankName + " (" + bankId + ") " + account.trim();
+  if (currentMode === "bill") {
+    // 繳費模式
+    var feeCode = feeSelect.value;
+    if (!feeCode) {
+      showError("請選擇繳費類別");
+      return;
+    }
+
+    var feeItem = TWQRP_FEE_LIST.find(function (f) { return f.code === feeCode; });
+    if (!feeItem) {
+      showError("無效的繳費類別");
+      return;
+    }
+
+    try {
+      dataStr = twqrpBillEncode(feeItem, account, amount, msg);
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+
+    description = feeItem.label + " " + account.trim();
+  } else {
+    // 轉帳模式
+    var bankId = bankSelect.value;
+    if (!bankId) {
+      showError("請選擇金融機構");
+      return;
+    }
+
+    try {
+      dataStr = twqrpEncode(bankId, account, amount, msg);
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+
+    var bankName = bicMap[bankId] || bankId;
+    description = bankName + " (" + bankId + ") " + account.trim();
+  }
 
   generateBtn.disabled = true;
   generateBtn.textContent = "產生中...";
@@ -231,9 +362,17 @@ qrForm.addEventListener("submit", function (e) {
 
 // ===== Download PNG =====
 downloadBtn.addEventListener("click", function () {
-  var bankId = bankSelect.value;
   var account = accountInput.value.trim();
-  var filename = (bicMap[bankId] || bankId) + "_" + account + ".png";
+  var filename;
+
+  if (currentMode === "bill") {
+    var feeCode = feeSelect.value;
+    var feeItem = TWQRP_FEE_LIST.find(function (f) { return f.code === feeCode; });
+    filename = (feeItem ? feeItem.label : feeCode) + "_" + account + ".png";
+  } else {
+    var bankId = bankSelect.value;
+    filename = (bicMap[bankId] || bankId) + "_" + account + ".png";
+  }
 
   qrCanvas.toBlob(function (blob) {
     if (window.saveAs) {
