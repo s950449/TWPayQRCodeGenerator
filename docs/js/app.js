@@ -24,6 +24,10 @@ var qrInfo = document.getElementById("qr-info");
 var downloadBtn = document.getElementById("download-btn");
 var errorMsg = document.getElementById("error-msg");
 
+var savedSelect = document.getElementById("saved-select");
+var savedDeleteBtn = document.getElementById("saved-delete-btn");
+var saveAccountBtn = document.getElementById("save-account-btn");
+
 var batchHeader = document.getElementById("batch-header");
 var batchBody = document.getElementById("batch-body");
 var fileDrop = document.getElementById("file-drop");
@@ -39,6 +43,88 @@ BIC_LIST.forEach(function (item) {
   opt.textContent = item.bic + " - " + item.name;
   bankSelect.appendChild(opt);
 });
+
+// ===== Saved Accounts =====
+var SAVED_KEY = "twpay_saved_accounts";
+
+function loadSavedAccounts() {
+  try {
+    var data = localStorage.getItem(SAVED_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSavedAccounts(list) {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(list));
+}
+
+function renderSavedSelect() {
+  // Remove all options except the first placeholder
+  while (savedSelect.options.length > 1) {
+    savedSelect.remove(1);
+  }
+  var accounts = loadSavedAccounts();
+  accounts.forEach(function (item, index) {
+    var opt = document.createElement("option");
+    opt.value = index;
+    opt.textContent = item.label;
+    savedSelect.appendChild(opt);
+  });
+  savedSelect.value = "";
+}
+
+savedSelect.addEventListener("change", function () {
+  var index = savedSelect.value;
+  if (index === "") return;
+  var accounts = loadSavedAccounts();
+  var item = accounts[index];
+  if (item) {
+    bankSelect.value = item.bankId;
+    accountInput.value = item.account;
+  }
+});
+
+saveAccountBtn.addEventListener("click", function () {
+  var bankId = bankSelect.value;
+  var account = accountInput.value.trim();
+  if (!bankId) {
+    showError("請先選擇金融機構");
+    return;
+  }
+  if (!account) {
+    showError("請先輸入帳號");
+    return;
+  }
+  hideError();
+
+  var bankName = bicMap[bankId] || bankId;
+  var lastFour = account.slice(-4);
+  var defaultLabel = bankName + " " + lastFour;
+  var label = prompt("請輸入常用帳號名稱", defaultLabel);
+  if (label === null) return; // user cancelled
+  if (!label.trim()) label = defaultLabel;
+
+  var accounts = loadSavedAccounts();
+  accounts.push({ label: label.trim(), bankId: bankId, account: account });
+  saveSavedAccounts(accounts);
+  renderSavedSelect();
+});
+
+savedDeleteBtn.addEventListener("click", function () {
+  var index = savedSelect.value;
+  if (index === "") return;
+  var accounts = loadSavedAccounts();
+  var item = accounts[index];
+  if (!item) return;
+  if (!confirm("確定要刪除「" + item.label + "」？")) return;
+  accounts.splice(index, 1);
+  saveSavedAccounts(accounts);
+  renderSavedSelect();
+});
+
+renderSavedSelect();
 
 // ===== Error Display =====
 function showError(msg) {

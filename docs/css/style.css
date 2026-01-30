@@ -291,6 +291,61 @@ footer a:hover {
   text-decoration: underline;
 }
 
+/* ===== Saved Accounts ===== */
+.saved-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.saved-row select {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.saved-row select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-save {
+  width: 100%;
+  background: #2563eb;
+  color: #fff;
+  margin-top: 8px;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-delete {
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #ef4444;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #dc2626;
+}
+
 /* ===== Hidden Utility ===== */
 .hidden {
   display: none !important;

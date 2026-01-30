@@ -26,6 +26,16 @@
 
       <form id="qr-form" autocomplete="off">
         <div class="form-group">
+          <label for="saved-select">常用帳號</label>
+          <div class="saved-row">
+            <select id="saved-select">
+              <option value="">-- 請選擇常用帳號 --</option>
+            </select>
+            <button type="button" class="btn btn-delete" id="saved-delete-btn">刪除</button>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label for="bank-select">金融機構</label>
           <select id="bank-select" required>
             <option value="">-- 請選擇金融機構 --</option>
@@ -48,6 +58,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary" id="generate-btn">產生 QR Code</button>
+        <button type="button" class="btn btn-save" id="save-account-btn">儲存此帳號</button>
       </form>
 
       <!-- 結果區 -->
