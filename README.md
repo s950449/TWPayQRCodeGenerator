@@ -1,6 +1,9 @@
 # 台灣Pay產生器API(J大產生器) Python client
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 線上版
+直接在瀏覽器使用，無需安裝：**[線上版 QR Code 產生器](https://s950449.github.io/TWPayQRCodeGenerator/)**
+
 ## 功能
 * 目前只支援銀行代號(Bank)以及帳戶號碼(Acc)，不支援收款金額設定及備註等功能
 * 在QRCode下方加入金融機構名稱以及帳戶號碼，方便辨識

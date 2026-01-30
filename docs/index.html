@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台灣 Pay QR Code 產生器</title>
+  <meta name="description" content="線上產生台灣 Pay (TWQRP) 轉帳 QR Code，支援單筆及 CSV 批次產生。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>台灣 Pay QR Code 產生器</h1>
+      <p>產生台灣 Pay 轉帳 QR Code（離線版）</p>
+    </header>
+
+    <!-- 單筆產生 -->
+    <section class="card" id="single-section">
+      <h2>單筆產生</h2>
+
+      <div class="error-msg" id="error-msg"></div>
+
+      <form id="qr-form" autocomplete="off">
+        <div class="form-group">
+          <label for="bank-select">金融機構</label>
+          <select id="bank-select" required>
+            <option value="">-- 請選擇金融機構 --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="account-input">帳號</label>
+          <input type="text" id="account-input" inputmode="numeric" pattern="[0-9]*" placeholder="請輸入帳號" required>
+        </div>
+
+        <div class="form-group">
+          <label for="amount-input">金額 <span class="optional">（選填）</span></label>
+          <input type="number" id="amount-input" min="1" max="9999999999999999" placeholder="不填則不指定金額">
+        </div>
+
+        <div class="form-group">
+          <label for="msg-input">備註 <span class="optional">（選填，限 19 字內）</span></label>
+          <input type="text" id="msg-input" maxlength="19" placeholder="轉帳備註">
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="generate-btn">產生 QR Code</button>
+      </form>
+
+      <!-- 結果區 -->
+      <div class="result-area hidden" id="result-area">
+        <canvas id="qr-canvas" width="650" height="650"></canvas>
+        <p class="qr-info" id="qr-info"></p>
+        <button type="button" class="btn btn-download" id="download-btn">下載 PNG</button>
+      </div>
+    </section>
+
+    <!-- CSV 批次產生 -->
+    <section class="card" id="batch-section">
+      <div class="collapsible-header" id="batch-header">
+        <h2>CSV 批次產生</h2>
+        <span class="arrow">&#9654;</span>
+      </div>
+      <div class="collapsible-body" id="batch-body">
+        <p style="font-size:0.8125rem;color:#888;margin-bottom:12px;">
+          CSV 格式：Name, BankID, Account, Amount（選填）, Msg（選填）
+        </p>
+        <div class="file-drop" id="file-drop">
+          <span>點擊或拖曳 CSV 檔案至此</span>
+          <input type="file" id="csv-input" accept=".csv">
+          <div class="file-name hidden" id="file-name"></div>
+        </div>
+        <button type="button" class="btn btn-primary" id="batch-btn" disabled style="margin-top:12px;">產生並下載 ZIP</button>
+        <div class="batch-progress hidden" id="batch-progress"></div>
+      </div>
+    </section>
+
+    <!-- 免責聲明 -->
+    <section class="card disclaimer">
+      <h2>免責聲明</h2>
+      <ul>
+        <li>使用本工具存在的風險將完全由使用者本人承擔，本工具作者不承擔任何責任</li>
+        <li>請謹慎使用此工具，小心詐騙，在轉帳前請確認帳號是否正確無誤</li>
+        <li>為了避免資訊安全方面的疑慮，建議使用各金融機構 App 產生的 QR Code 或在轉帳時手動輸入相關資訊</li>
+        <li>若因使用本工具導致任何財務損失，作者一概不負任何法律責任</li>
+      </ul>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <a href="https://github.com/s950449/TWPayQRCodeGenerator" target="_blank" rel="noopener">GitHub</a>
+      &middot; MIT License
+    </footer>
+  </div>
+
+  <!-- CDN Libraries (non-module) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <!-- App Scripts -->
+  <script src="js/bic-data.js"></script>
+  <script src="js/twqrp.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
