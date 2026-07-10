@@ -124,8 +124,8 @@ savedDeleteBtn.addEventListener("click", async function () {
 });
 
 savedStore.hasConsent().then((v) => { savedConsent.checked = v; });
-savedStore.subscribe(renderSavedSelect);
-savedImportBtn.addEventListener("click", async () => { if (!savedConsent.checked) return showError("請先同意在此裝置儲存完整帳號"); await savedStore.setConsent(); await savedStore.migrateLegacy(); renderSavedSelect(); });
+savedStore.subscribe(() => { renderSavedSelect().catch((e) => showError(e.message)); });
+savedImportBtn.addEventListener("click", async () => { try { if (!savedConsent.checked) return showError("請先同意在此裝置儲存完整帳號"); await savedStore.setConsent(); await savedStore.migrateLegacy(); renderSavedSelect(); } catch (e) { showError(e.message); } });
 savedClearBtn.addEventListener("click", async () => { if (confirm("確定要清除全部常用帳號？")) { await savedStore.clear(); renderSavedSelect(); } });
 renderSavedSelect();
 
