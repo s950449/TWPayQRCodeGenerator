@@ -2,3 +2,7 @@
 *.jpg
 .worktrees/
 .superpowers/
+__pycache__/
+*.py[cod]
+*.png.lock
+*.tmp.png
