@@ -5,21 +5,11 @@ from pathlib import Path
 
 from twpay_core import build_transfer_payload, request_online_payload, ValidationError
 from twpay_io import reserve_output_path, publish_image, OutputPathError
+from twpay_bic import read_bic_map
 
 MAX_CSV_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 1000
 MAX_CELL = 128
-
-
-def read_bic_map(path=Path("data/BIC.csv")):
-    with Path(path).open(newline="", encoding="utf-8") as handle:
-        rows = csv.DictReader(handle)
-        if not rows.fieldnames or not {"BIC", "Name"}.issubset(rows.fieldnames):
-            raise RuntimeError("BIC.csv 缺少必要欄位")
-        result = {}
-        for row in rows:
-            result[row["BIC"]] = row["Name"]
-        return result
 
 
 def gencode(data_str, bank_name, bank_id, account):
