@@ -4,7 +4,7 @@ import { SavedAccountStore } from "./saved-accounts.js";
 import { LatestOperation } from "./operation-controller.js";
 import { runBatch } from "./batch-runner.js";
 import { commitRenderedResult } from "./rendered-state.js";
-import { MAX_CSV_BYTES, validateRows } from "./csv-limits.js";
+import { MAX_CSV_BYTES, validateRows, sanitizeFilenameStem } from "./csv-limits.js";
 
 // ===== Constants =====
 var QR_SIZE = 650;
@@ -356,7 +356,7 @@ qrForm.addEventListener("submit", async function (e) {
     await fontsReady();
     var temporaryCanvas = document.createElement("canvas");
     await drawQR(temporaryCanvas, dataStr, description);
-    var committed = commitRenderedResult(singleJobs, id, { filename: (currentMode === "bill" ? (TWQRP_FEE_LIST.find(f => f.code === feeSelect.value)?.label || feeSelect.value) : (bicMap[bankSelect.value] || bankSelect.value)) + "_" + account.trim() + ".png", description });
+    var committed = commitRenderedResult(singleJobs, id, { filename: sanitizeFilenameStem(description, "qrcode") + ".png", description });
     if (committed === null) return;
     qrCanvas.width = temporaryCanvas.width; qrCanvas.height = temporaryCanvas.height;
     qrCanvas.getContext("2d").drawImage(temporaryCanvas, 0, 0);
@@ -462,11 +462,11 @@ function processBatch(rows, id) {
   var names = new Set();
   runBatch({ id, rows, isCurrent: batchJobs.isCurrent.bind(batchJobs), processRow: async function (row, index) {
     var bankId = String(row.BankID || "").trim(); var accountValue = String(row.Account || "").trim();
-    var nameValue = String(row.Name || "").trim().replace(/[^\w .-]/g, "_");
+    var nameValue = sanitizeFilenameStem(row.Name, "qr-" + (index + 1));
     if (!bankId || !(bankId in bicMap)) { errors.push((index + 1) + ": 無效的金融機構代碼 " + bankId); return; }
     var dataStr; try { dataStr = twqrpEncode(bankId, accountValue, row.Amount || null, row.Msg || null); } catch (error) { errors.push((index + 1) + ": " + error.message); return; }
-    var canvas = document.createElement("canvas"); await fontsReady(); await drawQR(canvas, dataStr, bicMap[bankId] + " (" + bankId + ") " + accountValue);
-    await new Promise(resolve => canvas.toBlob(blob => { var base = nameValue || ("qr-" + (index + 1)); var fname = base + ".png"; var n = 1; while (names.has(fname)) fname = base + "-" + (++n) + ".png"; names.add(fname); zip.file(fname, blob); resolve(); }, "image/png"));
+    var canvas = document.createElement("canvas"); await fontsReady(); if (!batchJobs.isCurrent(id)) return; await drawQR(canvas, dataStr, bicMap[bankId] + " (" + bankId + ") " + accountValue); if (!batchJobs.isCurrent(id)) return;
+    await new Promise(resolve => canvas.toBlob(blob => { if (!batchJobs.isCurrent(id)) return resolve(); var base = nameValue; var fname = base + ".png"; var n = 1; while (names.has(fname)) fname = base + "-" + (++n) + ".png"; names.add(fname); zip.file(fname, blob); resolve(); }, "image/png"));
   }, onProgress: function (done, count) { if (batchJobs.isCurrent(id)) batchProgress.textContent = "處理中 " + done + " / " + count; }, createArchive: function () { return zip.generateAsync({ type: "blob" }); }, onComplete: function (blob) { if (!batchJobs.isCurrent(id)) return; saveAs(blob, "TWPayQRCodes.zip"); finishBatchUI("完成！成功 " + (total - errors.length) + " 筆"); }, onError: function (err) { if (batchJobs.isCurrent(id)) finishBatchUI("CSV 處理失敗：" + err.message); } });
 }
 

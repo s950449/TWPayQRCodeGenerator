@@ -8,3 +8,7 @@ export function validateRows(rows) {
   }
   return rows;
 }
+export function sanitizeFilenameStem(value, fallback) {
+  const clean = String(value ?? "").replace(/[^A-Za-z0-9 ._-]/g, "_").trim();
+  return clean && clean !== "." && clean !== ".." ? clean : fallback;
+}
