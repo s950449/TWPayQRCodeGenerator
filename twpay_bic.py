@@ -104,7 +104,7 @@ def update_bic_dataset(http_get, destination: Path, url=CSV_URL):
         raise BicUpdateError("BIC 更新進行中") from exc
     try:
         response = http_get(url, timeout=10, allow_redirects=False, stream=True)
-        if getattr(response, "status_code", 200) != 200:
+        if getattr(response, "status_code", None) != 200:
             raise BicUpdateError("BIC 下載失敗")
         raise_for_status = getattr(response, "raise_for_status", None)
         if callable(raise_for_status): raise_for_status()
@@ -116,4 +116,7 @@ def update_bic_dataset(http_get, destination: Path, url=CSV_URL):
     except Exception as exc:
         raise BicUpdateError("BIC 更新失敗") from exc
     finally:
+        close = getattr(locals().get("response"), "close", None)
+        if callable(close):
+            close()
         lock.unlink(missing_ok=True)

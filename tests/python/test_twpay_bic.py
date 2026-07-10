@@ -12,6 +12,8 @@ class FakeResponse:
     def raise_for_status(self): return None
     def iter_content(self, chunk_size): yield self.payload
 
+    def close(self): self.closed = True
+
 
 SOURCE = "業務別,銀行代號/BIC/總機構代碼,金融機構名稱\n跨行自動化服務機器業務(金融卡),004,臺灣銀行\n"
 
@@ -44,3 +46,10 @@ class BicUpdateTests(TestCase):
             parse_source_bic_csv(b"a,b,c\n1,2,3\n")
         with self.assertRaises(BicUpdateError):
             parse_source_bic_csv("業務別,銀行代號/BIC/總機構代碼,金融機構名稱\n其他,004,銀行\n".encode())
+
+    def test_missing_http_status_is_rejected(self):
+        class Malformed(FakeResponse):
+            status_code = None
+        with TemporaryDirectory() as directory:
+            with self.assertRaises(BicUpdateError):
+                update_bic_dataset(lambda *args, **kwargs: Malformed(SOURCE.encode()), Path(directory) / "BIC.csv")
