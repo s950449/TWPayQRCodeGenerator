@@ -1,5 +1,6 @@
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm";
 import { TWQRP_FEE_LIST, twqrpBillEncode, twqrpEncode } from "./twqrp.js";
+import { SavedAccountStore } from "./saved-accounts.js";
 
 // ===== Constants =====
 var QR_SIZE = 650;
@@ -28,6 +29,10 @@ var errorMsg = document.getElementById("error-msg");
 var savedSelect = document.getElementById("saved-select");
 var savedDeleteBtn = document.getElementById("saved-delete-btn");
 var saveAccountBtn = document.getElementById("save-account-btn");
+var savedConsent = document.getElementById("saved-consent");
+var savedImportBtn = document.getElementById("saved-import-btn");
+var savedClearBtn = document.getElementById("saved-clear-btn");
+var savedStore = new SavedAccountStore();
 
 var feeSelect = document.getElementById("fee-select");
 var feeGroup = document.getElementById("fee-group");
@@ -57,48 +62,32 @@ BIC_LIST.forEach(function (item) {
 });
 
 // ===== Saved Accounts =====
-var SAVED_KEY = "twpay_saved_accounts";
-
-function loadSavedAccounts() {
-  try {
-    var data = localStorage.getItem(SAVED_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveSavedAccounts(list) {
-  localStorage.setItem(SAVED_KEY, JSON.stringify(list));
-}
-
-function renderSavedSelect() {
+async function renderSavedSelect() {
   // Remove all options except the first placeholder
   while (savedSelect.options.length > 1) {
     savedSelect.remove(1);
   }
-  var accounts = loadSavedAccounts();
-  accounts.forEach(function (item, index) {
+  var accounts = await savedStore.list();
+  accounts.forEach(function (item) {
     var opt = document.createElement("option");
-    opt.value = index;
+    opt.value = item.id;
     opt.textContent = item.label;
     savedSelect.appendChild(opt);
   });
   savedSelect.value = "";
 }
 
-savedSelect.addEventListener("change", function () {
+savedSelect.addEventListener("change", async function () {
   var index = savedSelect.value;
   if (index === "") return;
-  var accounts = loadSavedAccounts();
-  var item = accounts[index];
+  var item = (await savedStore.list()).find((x) => x.id === index);
   if (item) {
     bankSelect.value = item.bankId;
     accountInput.value = item.account;
   }
 });
 
-saveAccountBtn.addEventListener("click", function () {
+saveAccountBtn.addEventListener("click", async function () {
   var bankId = bankSelect.value;
   var account = accountInput.value.trim();
   if (!bankId) {
@@ -118,24 +107,26 @@ saveAccountBtn.addEventListener("click", function () {
   if (label === null) return; // user cancelled
   if (!label.trim()) label = defaultLabel;
 
-  var accounts = loadSavedAccounts();
-  accounts.push({ label: label.trim(), bankId: bankId, account: account });
-  saveSavedAccounts(accounts);
+  if (!savedConsent.checked) return showError("請先同意在此裝置儲存完整帳號");
+  await savedStore.setConsent();
+  await savedStore.add({ label: label.trim(), bankId, account });
   renderSavedSelect();
 });
 
-savedDeleteBtn.addEventListener("click", function () {
+savedDeleteBtn.addEventListener("click", async function () {
   var index = savedSelect.value;
   if (index === "") return;
-  var accounts = loadSavedAccounts();
-  var item = accounts[index];
+  var item = (await savedStore.list()).find((x) => x.id === index);
   if (!item) return;
   if (!confirm("確定要刪除「" + item.label + "」？")) return;
-  accounts.splice(index, 1);
-  saveSavedAccounts(accounts);
+  await savedStore.remove(item.id);
   renderSavedSelect();
 });
 
+savedStore.hasConsent().then((v) => { savedConsent.checked = v; });
+savedStore.subscribe(renderSavedSelect);
+savedImportBtn.addEventListener("click", async () => { if (!savedConsent.checked) return showError("請先同意在此裝置儲存完整帳號"); await savedStore.setConsent(); await savedStore.migrateLegacy(); renderSavedSelect(); });
+savedClearBtn.addEventListener("click", async () => { if (confirm("確定要清除全部常用帳號？")) { await savedStore.clear(); renderSavedSelect(); } });
 renderSavedSelect();
 
 // ===== Initialize Fee Select =====

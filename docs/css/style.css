@@ -156,6 +156,9 @@ header p {
 .btn-secondary:hover:not(:disabled) {
   background: #d1d5db;
 }
+.consent { display:block; margin-top:8px; font-size:.8125rem; color:#666; }
+.saved-controls { display:flex; gap:8px; margin-top:8px; }
+.saved-controls .btn { flex:1; padding:8px 12px; font-size:.8125rem; }
 
 /* ===== Result Area ===== */
 .result-area {
