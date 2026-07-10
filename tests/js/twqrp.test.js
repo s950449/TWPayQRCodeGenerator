@@ -1,0 +1,6 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { TwqrpValidationError, encodeTransfer, parseTransferPayload, twqrpBillEncode, TWQRP_FEE_LIST } from "../../docs/js/twqrp.js";
+test("encodes the maximum exact amount without Number rounding",()=>{const r=encodeTransfer({bankId:"004",account:"123",amount:"9999999999999999",memo:""});assert.match(r.payload,/&D1=999999999999999900&D9=$/);assert.deepEqual(parseTransferPayload(r.payload),{bankId:"004",account:"0000000000000123",amount:"9999999999999999",memo:""})});
+for(const [label,input] of [["field injection in memo",{bankId:"004",account:"123",amount:null,memo:"&D1=100"}],["field injection in account",{bankId:"004",account:"123&D1=100",amount:null,memo:""}],["partial numeric amount",{bankId:"004",account:"123",amount:"12abc",memo:""}],["seventeen-digit account",{bankId:"004",account:"12345678901234567",amount:null,memo:""}]]) test(`rejects ${label}`,()=>assert.throws(()=>encodeTransfer(input),TwqrpValidationError));
+test("keeps special bill URLs safe after validating an alphanumeric account",()=>{const fee=TWQRP_FEE_LIST.find(i=>i.spec==="Water");assert.match(twqrpBillEncode(fee,"AB12CD34EF5","10",""),/^https:\/\/www\.water\.gov\.tw\//);assert.throws(()=>twqrpBillEncode(fee,"AB12& D1","10",""),TwqrpValidationError)});

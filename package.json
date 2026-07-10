@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test:js":"node --test tests/js/*.test.js","verify:vendor":"node scripts/verify-vendor-assets.js"}}

@@ -5,10 +5,15 @@
  * 繳費格式：TWQRP://{FeeName}/158/03/V1?{PartialString}&D1={Amount}00&D7={Account}
  */
 
-const TWQRP_AMOUNT_MAX = 9999999999999999;
+export const TWQRP_AMOUNT_MAX = 9999999999999999n;
+const RESERVED_VALUE_CHARS = /[&=?#%\u0000-\u001F\u007F]/u;
+export class TwqrpValidationError extends Error {}
+function text(value, field) { const result=String(value ?? "").trim(); if ([...result].length>128) throw new TwqrpValidationError(`${field}過長`); return result; }
+function amount(value, required) { if (value==null||value==="") { if(required) throw new TwqrpValidationError("繳費模式需輸入金額"); return null; } const result=text(value,"金額"); if(!/^[1-9][0-9]*$/.test(result)||BigInt(result)>TWQRP_AMOUNT_MAX) throw new TwqrpValidationError("金額需介於 1 ~ 9999999999999999"); return result; }
+function memo(value) { const result=text(value,"備註"); if([...result].length>19||RESERVED_VALUE_CHARS.test(result)) throw new TwqrpValidationError("備註包含不支援的字元"); return result; }
 
 // ===== 繳費資料 =====
-var TWQRP_FEE_LIST = [
+export const TWQRP_FEE_LIST = [
   // 信用卡帳單
   { code: "006A", feeName: "合庫信用卡", label: "合作金庫 信用卡", group: "信用卡帳單",
     partialString: "D3=ARCD0UqJMB6l&D11=00,0060067079912831443144000100170003&D15=000", spec: "Regular",
@@ -49,7 +54,7 @@ var TWQRP_FEE_LIST = [
     hint: "", serviceFee: 3 }
 ];
 
-/**
+/*
  * 驗證並產生 TWQRP 繳費字串
  * @param {object} feeItem  - TWQRP_FEE_LIST 中的項目
  * @param {string} account  - 繳費帳號/單號
@@ -58,21 +63,13 @@ var TWQRP_FEE_LIST = [
  * @returns {string} TWQRP 繳費編碼字串
  * @throws {Error} 驗證失敗時拋出錯誤
  */
-function twqrpBillEncode(feeItem, account, amount, memo) {
+export function twqrpBillEncode(feeItem, account, rawAmount, rawMemo) {
+  if (!TWQRP_FEE_LIST.includes(feeItem)) throw new TwqrpValidationError("繳費項目無效");
+  const accountText=text(account,"繳費帳號");
+  if (!/^[A-Za-z0-9]{1,64}$/.test(accountText)) throw new TwqrpValidationError("請輸入繳費帳號");
+  const amountText=amount(rawAmount,true), memoText=memo(rawMemo);
+  const amountNum=amountText;
   // 驗證帳號
-  account = (account || "").trim();
-  if (account.length === 0) {
-    throw new Error("請輸入繳費帳號");
-  }
-
-  // 驗證金額（繳費模式必填）
-  if (amount == null || amount === "") {
-    throw new Error("繳費模式需輸入金額");
-  }
-  var amountNum = parseInt(amount, 10);
-  if (isNaN(amountNum) || amountNum < 1 || amountNum > TWQRP_AMOUNT_MAX) {
-    throw new Error("金額需介於 1 ~ " + TWQRP_AMOUNT_MAX);
-  }
 
   // 組合基本 TWQRP 繳費字串
   var uriString =
@@ -82,9 +79,7 @@ function twqrpBillEncode(feeItem, account, amount, memo) {
     "&D7=" + account;
 
   // 附加備註
-  if (memo && memo.trim()) {
-    uriString += "&D9=" + memo.trim();
-  }
+  if (memoText) uriString += "&D9=" + memoText;
 
   // 依 spec 處理特殊 URL 包裝
   var result;
@@ -115,7 +110,7 @@ function twqrpBillEncode(feeItem, account, amount, memo) {
  * @returns {string} TWQRP 編碼字串
  * @throws {Error} 驗證失敗時拋出錯誤
  */
-function twqrpEncode(bankId, account, amount, msg) {
+function legacyTwqrpEncode(bankId, account, amount, msg) {
   // 驗證帳號
   account = account.trim();
   if (account.length === 0) {
@@ -164,3 +159,17 @@ function twqrpEncode(bankId, account, amount, msg) {
 
   return ret;
 }
+
+export function validateTransfer({bankId, account, amount: rawAmount, memo: rawMemo}) {
+  const b=text(bankId,"金融機構代碼"), a=text(account,"帳號");
+  if(!/^[0-9]{3}$/.test(b)) throw new TwqrpValidationError("金融機構代碼無效");
+  if(!/^[0-9]{1,16}$/.test(a)) throw new TwqrpValidationError("帳號必須是 1 至 16 位數字");
+  return {bankId:b,account:a.padStart(16,"0"),amount:amount(rawAmount,false),memo:memo(rawMemo)};
+}
+export function encodeTransfer(input) { const f=validateTransfer(input); let p=`TWQRP://${f.bankId}NTTransfer/158/02/V1?D6=${f.account}&D5=${f.bankId}&D10=901`; if(f.amount!==null)p+=`&D1=${f.amount}00`; return {fields:f,payload:`${p}&D9=${f.memo}`}; }
+export function parseTransferPayload(payload) {
+  const m=/^TWQRP:\/\/([0-9]{3})NTTransfer\/158\/02\/V1\?(.+)$/u.exec(payload); if(!m) throw new TwqrpValidationError("線上服務回傳的 TWQRP 格式無效"); const s=new Map(), allow=new Set(["D1","D5","D6","D9","D10"]);
+  for(const pair of m[2].split("&")){const [k,v,...x]=pair.split("="); if(!k||!allow.has(k)||x.length||s.has(k)) throw new TwqrpValidationError("TWQRP 欄位重複或格式無效"); s.set(k,v??"");}
+  if(!s.has("D9")||s.get("D5")!==m[1]||!/^[0-9]{16}$/.test(s.get("D6")??"")||s.get("D10")!=="901") throw new TwqrpValidationError("TWQRP 必要欄位無效"); const r=s.get("D1"); const a=r==null?null:r.endsWith("00")?r.slice(0,-2):null; if(r!=null&&(!a||!/^[1-9][0-9]*$/.test(a))) throw new TwqrpValidationError("TWQRP 金額無效"); return {bankId:m[1],account:s.get("D6"),amount:a,memo:s.get("D9")??""};
+}
+export const twqrpEncode = (bankId, account, amountValue, msg) => encodeTransfer({bankId, account, amount: amountValue, memo: msg}).payload;
