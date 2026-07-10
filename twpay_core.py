@@ -38,7 +38,7 @@ def validate_transfer(bank_id, account, amount=None, memo=""):
     acct = acct.zfill(16)
     raw_amount = "" if amount is None else str(amount)
     if raw_amount:
-        if raw_amount != raw_amount.strip() or not re.fullmatch(r"[1-9][0-9]*", raw_amount):
+        if raw_amount != raw_amount.strip() or len(raw_amount) > 16 or not re.fullmatch(r"[1-9][0-9]*", raw_amount):
             raise ValidationError("invalid amount")
         if int(raw_amount) > AMOUNT_MAX:
             raise ValidationError("invalid amount")
@@ -61,20 +61,24 @@ def parse_transfer_payload(payload):
     if not match:
         raise ValidationError("invalid payload")
     fields = {}
-    for pair in match.group(2).split("&"):
+    pairs = match.group(2).split("&")
+    for pair in pairs:
         bits = pair.split("=")
         if len(bits) != 2 or bits[0] not in {"D1", "D5", "D6", "D9", "D10"} or bits[0] in fields:
             raise ValidationError("invalid fields")
         fields[bits[0]] = bits[1]
+    expected_order = ["D6", "D5", "D10", "D1", "D9"] if "D1" in fields else ["D6", "D5", "D10", "D9"]
+    if [p.split("=", 1)[0] for p in pairs] != expected_order:
+        raise ValidationError("noncanonical field order")
     if fields.get("D5") != match.group(1) or not re.fullmatch(r"[0-9]{16}", fields.get("D6", "")) or fields.get("D10") != "901" or "D9" not in fields:
         raise ValidationError("invalid required fields")
     raw = fields.get("D1")
     amount = None
     if raw is not None:
-        if not raw.endswith("00") or not re.fullmatch(r"[1-9][0-9]*", raw[:-2]) or int(raw[:-2]) > AMOUNT_MAX:
+        if not raw.endswith("00") or len(raw[:-2]) > 16 or not re.fullmatch(r"[1-9][0-9]*", raw[:-2]) or int(raw[:-2]) > AMOUNT_MAX:
             raise ValidationError("invalid amount")
         amount = raw[:-2]
-    if len(fields["D9"]) > 19 or _RESERVED.search(fields["D9"]):
+    if fields["D9"] != fields["D9"].strip() or len(fields["D9"]) > 19 or _RESERVED.search(fields["D9"]):
         raise ValidationError("invalid memo")
     return {"bank_id": match.group(1), "account": fields["D6"], "amount": amount, "memo": fields["D9"]}
 
@@ -88,12 +92,20 @@ def request_online_payload(bank_id, account, amount=None, memo="", *, http_get, 
     if getattr(response, "status_code", None) != 200:
         raise ValidationError("online request failed")
     try:
-        if int(response.headers.get("Content-Length", "0")) > MAX_API_RESPONSE_BYTES:
+        headers = response.headers
+        if not hasattr(headers, "get"):
+            raise ValidationError("invalid response headers")
+        if int(headers.get("Content-Length", "0")) > MAX_API_RESPONSE_BYTES:
             raise ValidationError("online response too large")
     except (TypeError, ValueError):
         raise ValidationError("invalid response length")
+    iterator = getattr(response, "iter_content", None)
+    if not callable(iterator):
+        raise ValidationError("invalid response body")
     data = b""
-    for chunk in response.iter_content(8192):
+    for chunk in iterator(8192):
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise ValidationError("invalid response body")
         data += chunk
         if len(data) > MAX_API_RESPONSE_BYTES:
             raise ValidationError("online response too large")

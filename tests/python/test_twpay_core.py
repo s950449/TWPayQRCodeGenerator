@@ -41,6 +41,21 @@ class TransferCoreTests(TestCase):
         with self.assertRaises(ValidationError):
             parse_transfer_payload("TWQRP://004NTTransfer/158/02/V1?D6=0000000000000123&D6=0000000000000123&D5=004&D10=901&D9=")
 
+    def test_noncanonical_order_and_memo_whitespace_rejected(self):
+        with self.assertRaises(ValidationError):
+            parse_transfer_payload("TWQRP://004NTTransfer/158/02/V1?D5=004&D6=0000000000000123&D10=901&D9=")
+        with self.assertRaises(ValidationError):
+            parse_transfer_payload("TWQRP://004NTTransfer/158/02/V1?D6=0000000000000123&D5=004&D10=901&D9= ")
+
+    def test_giant_amount_rejected(self):
+        with self.assertRaises(ValidationError):
+            build_transfer_payload("004", "123", "1" * 17, "")
+
+    def test_malformed_response_adapter_rejected(self):
+        class Bad: status_code = 200; headers = None
+        with self.assertRaises(ValidationError):
+            request_online_payload("004", "123", None, "", http_get=lambda *a, **k: Bad())
+
     def test_online_request_is_bounded_and_exact(self):
         expected = build_transfer_payload("004", "123", None, "")
         calls = []
