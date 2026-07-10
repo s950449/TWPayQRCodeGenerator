@@ -1,0 +1,8 @@
+{
+  "assets": [
+    {"path":"docs/vendor/qrcode-1.5.3.mjs","version":"1.5.3","source":"https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm","sha256":"f81e2fb6d1ab933a0392e4a7318f2e22601db2f7c003eecab5da3bdcc77e19c6","license":"MIT"},
+    {"path":"docs/vendor/papaparse-5.4.1.min.js","version":"5.4.1","source":"https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js","sha256":"b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb","license":"MIT"},
+    {"path":"docs/vendor/jszip-3.10.1.min.js","version":"3.10.1","source":"https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js","sha256":"acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e","license":"MIT/GPL-3.0"},
+    {"path":"docs/vendor/file-saver-2.0.5.min.js","version":"2.0.5","source":"https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js","sha256":"c68874cbaa2fd1650b7d770b328680ea765fb3376023cc3608427fde4f0d0481","license":"MIT"}
+  ]
+}

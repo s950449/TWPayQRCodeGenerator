@@ -156,6 +156,9 @@ header p {
 .btn-secondary:hover:not(:disabled) {
   background: #d1d5db;
 }
+.consent { display:block; margin-top:8px; font-size:.8125rem; color:#666; }
+.saved-controls { display:flex; gap:8px; margin-top:8px; }
+.saved-controls .btn { flex:1; padding:8px 12px; font-size:.8125rem; }
 
 /* ===== Result Area ===== */
 .result-area {
@@ -231,6 +234,7 @@ header p {
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
+.file-drop.disabled { opacity: .6; pointer-events: none; }
 
 .file-drop:hover {
   border-color: #2563eb;
@@ -409,6 +413,16 @@ footer a:hover {
 /* ===== Hidden Utility ===== */
 .hidden {
   display: none !important;
+}
+
+.csv-hint {
+  font-size: 0.8125rem;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.batch-action {
+  margin-top: 12px;
 }
 
 /* ===== Responsive ===== */
