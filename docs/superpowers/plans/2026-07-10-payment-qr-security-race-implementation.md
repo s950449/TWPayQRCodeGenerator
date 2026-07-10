@@ -29,6 +29,7 @@
 | `docs/js/twqrp.js` | Pure ESM payment validation, canonical transfer/bill encoding, and transfer payload parsing. |
 | `docs/js/operation-controller.js` | Monotonic operation IDs used to reject stale callbacks. |
 | `docs/js/batch-runner.js` | Iterative, ownership-aware batch orchestration independent of the DOM. |
+| `docs/js/rendered-state.js` | Pure commit gate for latest rendered-canvas/download metadata. |
 | `docs/js/saved-accounts.js` | IndexedDB account repository, UUID records, consent and cross-tab notification. |
 | `docs/js/app.js` | Browser adapter: form state, temporary canvases, DOM updates, and user messages. |
 | `docs/index.html`, `docs/css/style.css` | Consent/clear controls, local assets, and CSP-compatible styling. |
@@ -403,11 +404,12 @@ git commit -m "refactor: persist saved accounts with stable IDs"
 - Modify: `docs/js/app.js:1-560`
 - Modify: `docs/index.html:72-117`
 - Modify: `docs/css/style.css`
+- Create: `docs/js/rendered-state.js`
 - Create: `tests/js/app-state.test.js`
 
 **Interfaces:**
 - Consumes: `encodeTransfer`, `twqrpBillEncode`, `LatestOperation`, `runBatch`, and `SavedAccountStore` from Tasks 1–3.
-- Produces: a visible canvas and download metadata that always belong to the same completed request.
+- Produces: `commitRenderedResult(operation, id, metadata)` plus a visible canvas and download metadata that always belong to the same completed request.
 
 - [ ] **Step 1: Write a failing pure state test for the rendered-download snapshot**
 
@@ -415,15 +417,14 @@ git commit -m "refactor: persist saved accounts with stable IDs"
 import test from "node:test";
 import assert from "node:assert/strict";
 import { LatestOperation } from "../../docs/js/operation-controller.js";
+import { commitRenderedResult } from "../../docs/js/rendered-state.js";
 
-test("only the current request may replace rendered download metadata", () => {
+test("stale requests cannot replace rendered download metadata", () => {
   const jobs = new LatestOperation();
-  let rendered = null;
   const first = jobs.start();
   const second = jobs.start();
-  if (jobs.isCurrent(first)) rendered = { filename: "old.png" };
-  if (jobs.isCurrent(second)) rendered = { filename: "new.png" };
-  assert.deepEqual(rendered, { filename: "new.png" });
+  assert.equal(commitRenderedResult(jobs, first, { filename: "old.png" }), null);
+  assert.deepEqual(commitRenderedResult(jobs, second, { filename: "new.png" }), { filename: "new.png" });
 });
 ```
 
@@ -431,11 +432,21 @@ test("only the current request may replace rendered download metadata", () => {
 
 Run: `node --test tests/js/app-state.test.js`
 
-Expected: PASS for the already-implemented primitive; this establishes the ownership invariant used by the DOM adapter.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `docs/js/rendered-state.js`; this is the RED proof for the new commit gate.
 
 - [ ] **Step 3: Make `app.js` honor operation ownership at every async boundary**
 
-Use this single-generation shape; `copyCanvas` must run only after the second current-ID check:
+Implement the commit gate first:
+
+```js
+// docs/js/rendered-state.js
+export function commitRenderedResult(operation, id, metadata) {
+  if (!operation.isCurrent(id)) return null;
+  return Object.freeze({ ...metadata });
+}
+```
+
+Use this single-generation shape; `copyCanvas` must run only after the commit gate:
 
 ```js
 const singleJobs = new LatestOperation();
@@ -449,10 +460,12 @@ async function generateSingle(dataStr, description, filename) {
     const temporaryCanvas = document.createElement("canvas");
     await drawQR(temporaryCanvas, dataStr, description);
     if (!singleJobs.isCurrent(id)) return;
+    const committed = commitRenderedResult(singleJobs, id, { filename, description });
+    if (committed === null) return;
     qrCanvas.width = temporaryCanvas.width;
     qrCanvas.height = temporaryCanvas.height;
     qrCanvas.getContext("2d").drawImage(temporaryCanvas, 0, 0);
-    lastRendered = { filename, description };
+    lastRendered = committed;
     qrInfo.textContent = description;
     resultArea.classList.remove("hidden");
   } catch (error) {
@@ -479,7 +492,7 @@ Expected: PASS with no syntax errors.
 - [ ] **Step 5: Commit UI ownership and resource-limit integration**
 
 ```bash
-git add docs/js/app.js docs/index.html docs/css/style.css tests/js/app-state.test.js
+git add docs/js/app.js docs/js/rendered-state.js docs/index.html docs/css/style.css tests/js/app-state.test.js
 git commit -m "fix: serialize browser QR generation jobs"
 ```
 
