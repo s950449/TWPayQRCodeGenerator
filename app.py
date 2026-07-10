@@ -1,118 +1,76 @@
-import json
-import requests
-import csv
-import qrcode
 import argparse
-import mimetypes
+import csv
 import math
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
+from pathlib import Path
 
-API_url = "https://i-tw.org/twpay/api"
-AMOUNT_MAX = 9999999999999999
-def call_API(BankID,Account,offline,verbose,Amount,Msg):
-    amount_flag = False
-    if Msg != None:
-        if len(Msg)<0 or len(Msg)>=20:
-            raise RuntimeError("Message length is not in range")
-    else:
-        Msg =''
-    if Amount != None: 
-        Amount = int(Amount)
-        if Amount >= 1 and Amount <= AMOUNT_MAX:
-            amount_flag = True
-    if offline:
-        ret = offline_genstr(BankID, Account,Amount,amount_flag,Msg)
-        return ret
-    my_params = {"Bank": BankID,"Acc": Account,"Msg": Msg}
-    if amount_flag:
-        my_params["Amount"] = Amount
-    r = requests.get(API_url,params = my_params)
-    if r.status_code != 200:
-        raise ("Failed to generate code with input:",my_params)
-    try:
-        response = r.json()
-    except:
-        print("Failed to parse json response, switch to offline mode")
-        ret = offline_genstr(BankID, Account,Amount,amount_flag,Msg)
-        return ret
-    if verbose:
-        print(response)
-    if response["Success"] != '1':
-        raise RuntimeError("Failed to generate code with input:",my_params)
-    return response['String']
+from twpay_core import build_transfer_payload, request_online_payload, ValidationError
+from twpay_io import reserve_output_path, publish_image, OutputPathError
 
-def gencode(data_str,name,BankName,BankID,Account):
-    qr = qrcode.QRCode(
-    version=1,
-    error_correction=qrcode.constants.ERROR_CORRECT_H,
-    box_size=10,
-    border=4,
-)
-    qr.add_data(data_str)
-    img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
-    width,height = img.size
-    output_width = 650
-    output_height = 650
-    x1 = int(math.floor(output_width - width)/2)
-    y1 = int(math.floor(output_height - height)/2)
-    newImg = Image.new("RGB",(output_width,output_height),(255,255,255))
-    newImg.paste(img,(x1,y1,x1+width,y1+height))
-    draw = ImageDraw.Draw(newImg)
-    description = BankName+' ('+BankID+') '+Account
-    cjk_font = ImageFont.FreeTypeFont("fonts/NotoSansCJKtc-Light.otf",size=24)
-    t_w = draw.textlength(description, cjk_font)
-    draw.text(((output_width - t_w) / 2,output_height-50),description,(0,0,0),font=cjk_font)
-    newImg.save(name+".png")
+MAX_CSV_BYTES = 5 * 1024 * 1024
+MAX_ROWS = 1000
+MAX_CELL = 128
 
-def prepare_BICList():
-    ret = dict()
-    biccsv = "data/BIC.csv"
-    file_type,file_encoding = mimetypes.guess_type(biccsv)
-    if file_type != "text/csv": 
-        raise RuntimeError("data/BIC.csv is not csv file")
-    with open(biccsv) as biclist:
-        rows = csv.DictReader(biclist) 
+
+def read_bic_map(path=Path("data/BIC.csv")):
+    with Path(path).open(newline="", encoding="utf-8") as handle:
+        rows = csv.DictReader(handle)
+        if not rows.fieldnames or not {"BIC", "Name"}.issubset(rows.fieldnames):
+            raise RuntimeError("BIC.csv 缺少必要欄位")
+        result = {}
         for row in rows:
-            ret[row["BIC"]] = row["Name"]
-    return ret
+            result[row["BIC"]] = row["Name"]
+        return result
 
-def offline_genstr(BankID,Account,Amount,amount_flag=False,Msg=''):
-    Account = Account.strip()  
-    AccountLength = len(Account) - 1
-    if AccountLength > 16:
-        raise RuntimeError("Account Length is greater than 16")
-    Account = Account.zfill(16)
-    ret = 'TWQRP://'+BankID+'NTTransfer/158/02/V1?D6='+Account+'&D5='+BankID+'&D10=901'
-    if amount_flag:
-        ret += '&D1=' + str(Amount)+'00'
-    ret = ret +'&D9='+Msg
-    return ret   
 
-if __name__ == '__main__':
+def gencode(data_str, bank_name, bank_id, account):
+    import qrcode
+    from PIL import Image, ImageDraw, ImageFont
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
+    qr.add_data(data_str); img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    width, height = img.size; out = Image.new("RGB", (650, 650), (255, 255, 255))
+    out.paste(img, (int((650-width)/2), int((650-height)/2)))
+    draw = ImageDraw.Draw(out)
+    font = ImageFont.FreeTypeFont("fonts/NotoSansCJKtc-Light.otf", size=24)
+    description = f"{bank_name} ({bank_id}) {account}"
+    draw.text(((650 - draw.textlength(description, font))/2, 600), description, (0, 0, 0), font=font)
+    return out
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("inputFile",type=str,help="Input File")
-    parser.add_argument("--offline",action="store_true",help="Offline mode")
-    parser.add_argument("-v","--verbose",action="store_true",help="Verbose mode")    
-    args = parser.parse_args()
-    offline = args.offline
-    verbose = args.verbose
-    inputFile = args.inputFile
-    file_type,file_encoding = mimetypes.guess_type(inputFile)
-    if file_type != "text/csv":   
-        raise RuntimeError("Input is not csv file")
-    BIC_List = prepare_BICList()
+    parser.add_argument("inputFile", type=Path, help="Input CSV file")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--online", action="store_true", help="Explicitly use the online API")
+    mode.add_argument("--offline", action="store_false", dest="online", help=argparse.SUPPRESS)
+    parser.set_defaults(online=False)
+    parser.add_argument("--output-dir", type=Path, default=Path("."))
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args(argv)
+    if args.inputFile.stat().st_size > MAX_CSV_BYTES:
+        raise RuntimeError("CSV 檔案過大")
+    bic = read_bic_map()
+    required = {"Name", "BankID", "Account"}
+    with args.inputFile.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            raise RuntimeError("CSV 缺少必要欄位")
+        for index, row in enumerate(reader, 1):
+            if index > MAX_ROWS or any(len(str(v or "")) > MAX_CELL for v in row.values()):
+                raise RuntimeError("CSV 資料超過限制")
+            bank_id, account = row["BankID"], row["Account"]
+            amount, memo = row.get("Amount") or None, row.get("Msg") or ""
+            if bank_id not in bic:
+                raise RuntimeError(f"未知銀行代碼: {bank_id}")
+            if args.online:
+                import requests
+                payload = request_online_payload(bank_id, account, amount, memo, http_get=requests.get)
+            else:
+                payload = build_transfer_payload(bank_id, account, amount, memo)
+            image = gencode(payload, bic[bank_id], bank_id, account)
+            reservation = reserve_output_path(args.output_dir, row["Name"])
+            publish_image(image, reservation)
+            if args.verbose: print(payload)
 
-    with open(inputFile,newline='') as csvfile:
-        rows = csv.DictReader(csvfile)
-        for row in rows:
-                if row["BankID"] in BIC_List:
-                    if 'Amount' not in row:
-                        row["Amount"] = None
-                    if 'Msg' not in row:
-                        row["Msg"] = None
-                    data_str = call_API(row["BankID"],row["Account"],offline,verbose,row["Amount"],row["Msg"])
-                    if verbose:
-                        print(data_str)
-                    gencode(data_str,row["Name"],BIC_List[row["BankID"]],row["BankID"],row["Account"])
+
+if __name__ == "__main__":
+    main()
