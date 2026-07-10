@@ -1,6 +1,9 @@
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm";
 import { TWQRP_FEE_LIST, twqrpBillEncode, twqrpEncode } from "./twqrp.js";
 import { SavedAccountStore } from "./saved-accounts.js";
+import { LatestOperation } from "./operation-controller.js";
+import { runBatch } from "./batch-runner.js";
+import { commitRenderedResult } from "./rendered-state.js";
 
 // ===== Constants =====
 var QR_SIZE = 650;
@@ -52,6 +55,9 @@ var csvInput = document.getElementById("csv-input");
 var fileName = document.getElementById("file-name");
 var batchBtn = document.getElementById("batch-btn");
 var batchProgress = document.getElementById("batch-progress");
+var singleJobs = new LatestOperation();
+var batchJobs = new LatestOperation();
+var lastRendered = null;
 
 // ===== Initialize Bank Select =====
 BIC_LIST.forEach(function (item) {
@@ -211,6 +217,7 @@ modeTabs.forEach(function (tab) {
     }
 
     // Reset form & result
+    singleJobs.invalidate(); lastRendered = null;
     qrForm.reset();
     renderSavedSelect();
     feeHint.textContent = "";
@@ -221,6 +228,11 @@ modeTabs.forEach(function (tab) {
     hideError();
     resultArea.classList.add("hidden");
   });
+});
+
+[bankSelect, accountInput, amountInput, msgInput, feeSelect].forEach(function (el) {
+  el.addEventListener("input", function () { singleJobs.invalidate(); lastRendered = null; });
+  el.addEventListener("change", function () { singleJobs.invalidate(); lastRendered = null; });
 });
 
 // ===== Error Display =====
@@ -284,7 +296,7 @@ function fontsReady() {
 }
 
 // ===== Single QR Generation =====
-qrForm.addEventListener("submit", function (e) {
+qrForm.addEventListener("submit", async function (e) {
   e.preventDefault();
   hideError();
   resultArea.classList.add("hidden");
@@ -336,35 +348,35 @@ qrForm.addEventListener("submit", function (e) {
     description = bankName + " (" + bankId + ") " + account.trim();
   }
 
-  generateBtn.disabled = true;
-  generateBtn.textContent = "產生中...";
-
-  fontsReady().then(function () {
-    return drawQR(qrCanvas, dataStr, description);
-  }).then(function () {
-    qrInfo.textContent = description;
-    resultArea.classList.remove("hidden");
-  }).catch(function (err) {
-    showError("QR Code 產生失敗：" + err.message);
-  }).finally(function () {
-    generateBtn.disabled = false;
-    generateBtn.textContent = "產生 QR Code";
-  });
+  var id = singleJobs.start();
+  generateBtn.disabled = true; generateBtn.textContent = "產生中...";
+  try {
+    await fontsReady();
+    var temporaryCanvas = document.createElement("canvas");
+    await drawQR(temporaryCanvas, dataStr, description);
+    var committed = commitRenderedResult(singleJobs, id, { filename: (currentMode === "bill" ? (TWQRP_FEE_LIST.find(f => f.code === feeSelect.value)?.label || feeSelect.value) : (bicMap[bankSelect.value] || bankSelect.value)) + "_" + account.trim() + ".png", description });
+    if (committed === null) return;
+    qrCanvas.width = temporaryCanvas.width; qrCanvas.height = temporaryCanvas.height;
+    qrCanvas.getContext("2d").drawImage(temporaryCanvas, 0, 0);
+    lastRendered = committed; qrInfo.textContent = description; resultArea.classList.remove("hidden");
+  } catch (err) { if (singleJobs.isCurrent(id)) showError("QR Code 產生失敗：" + err.message); }
+  finally { if (singleJobs.isCurrent(id)) { generateBtn.disabled = false; generateBtn.textContent = "產生 QR Code"; } }
 });
 
 // ===== Download PNG =====
 downloadBtn.addEventListener("click", function () {
+  if (!lastRendered) return;
   var account = accountInput.value.trim();
-  var filename;
+  var filename = lastRendered.filename;
 
-  if (currentMode === "bill") {
+  /*if (currentMode === "bill") {
     var feeCode = feeSelect.value;
     var feeItem = TWQRP_FEE_LIST.find(function (f) { return f.code === feeCode; });
     filename = (feeItem ? feeItem.label : feeCode) + "_" + account + ".png";
   } else {
     var bankId = bankSelect.value;
     filename = (bicMap[bankId] || bankId) + "_" + account + ".png";
-  }
+  }*/
 
   qrCanvas.toBlob(function (blob) {
     if (window.saveAs) {
@@ -390,6 +402,7 @@ batchHeader.addEventListener("click", function () {
 
 // ===== File Drop / Select =====
 fileDrop.addEventListener("click", function () {
+  if (batchBtn.disabled && batchJobs.isCurrent(batchRunId)) return;
   csvInput.click();
 });
 
@@ -421,21 +434,32 @@ csvInput.addEventListener("change", function () {
 });
 
 function onFileSelected(file) {
+  if (batchActive) return;
   fileName.textContent = file.name;
   fileName.classList.remove("hidden");
   batchBtn.disabled = false;
 }
 
 // ===== Batch Processing =====
-batchBtn.addEventListener("click", function () {
+var batchActive = false; var batchRunId = 0;
+batchBtn.addEventListener("click", async function () {
   var file = csvInput.files[0];
-  if (!file) return;
+  if (!file || batchActive) return;
+  if (file.size > 5 * 1024 * 1024) { batchProgress.textContent = "CSV 檔案過大（上限 5 MB）"; batchProgress.classList.remove("hidden"); return; }
+  batchActive = true; csvInput.disabled = true; fileDrop.classList.add("disabled");
+  var id = batchJobs.start(); batchRunId = id;
 
   batchBtn.disabled = true;
   batchProgress.classList.remove("hidden");
   batchProgress.textContent = "解析 CSV 中...";
 
-  Papa.parse(file, {
+  try {
+    var results = await new Promise(function (resolve, reject) { Papa.parse(file, { header: true, skipEmptyLines: true, complete: resolve, error: reject }); });
+    if (results.data.length > 5000) throw new Error("CSV 資料列數超過上限 5000");
+    if (results.meta && results.meta.fields && results.meta.fields.length > 20) throw new Error("CSV 欄位數超過上限 20");
+    processBatch(results.data, id);
+  } catch (err) { batchProgress.textContent = "CSV 解析失敗：" + err.message; batchActive = false; csvInput.disabled = false; fileDrop.classList.remove("disabled"); batchBtn.disabled = false; }
+/*  Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: function (results) {
@@ -445,18 +469,18 @@ batchBtn.addEventListener("click", function () {
       batchProgress.textContent = "CSV 解析失敗：" + err.message;
       batchBtn.disabled = false;
     }
-  });
+  }); */
 });
 
-function processBatch(rows) {
+function processBatch(rows, id) {
   var zip = new JSZip();
   var total = rows.length;
   var processed = 0;
   var errors = [];
 
-  function processNext(index) {
+  async function processNext(index) {
     if (index >= total) {
-      finishBatch(zip, errors, total);
+      finishBatch(zip, errors, total, id);
       return;
     }
 
@@ -471,7 +495,7 @@ function processBatch(rows) {
       errors.push((index + 1) + ": 無效的金融機構代碼 " + bankId);
       processed++;
       batchProgress.textContent = "處理中 " + processed + " / " + total;
-      processNext(index + 1);
+      Promise.resolve().then(function () { processNext(index + 1); });
       return;
     }
 
@@ -482,7 +506,7 @@ function processBatch(rows) {
       errors.push((index + 1) + ": " + err.message);
       processed++;
       batchProgress.textContent = "處理中 " + processed + " / " + total;
-      processNext(index + 1);
+      Promise.resolve().then(function () { processNext(index + 1); });
       return;
     }
 
@@ -506,7 +530,7 @@ function processBatch(rows) {
     }).then(function () {
       processed++;
       batchProgress.textContent = "處理中 " + processed + " / " + total;
-      processNext(index + 1);
+      Promise.resolve().then(function () { processNext(index + 1); });
     }).catch(function (err) {
       errors.push((index + 1) + ": QR 產生失敗 - " + err.message);
       processed++;
@@ -518,27 +542,27 @@ function processBatch(rows) {
   processNext(0);
 }
 
-function finishBatch(zip, errors, total) {
+function finishBatch(zip, errors, total, id) {
   var successCount = total - errors.length;
 
   if (successCount === 0) {
     batchProgress.textContent = "全部失敗。" + errors.join("；");
-    batchBtn.disabled = false;
+    batchBtn.disabled = false; batchActive = false; csvInput.disabled = false; fileDrop.classList.remove("disabled");
     return;
   }
 
   batchProgress.textContent = "打包 ZIP 中...";
 
   zip.generateAsync({ type: "blob" }).then(function (blob) {
-    saveAs(blob, "TWPayQRCodes.zip");
+    if (batchJobs.isCurrent(id)) saveAs(blob, "TWPayQRCodes.zip");
     var msg = "完成！成功 " + successCount + " 筆";
     if (errors.length > 0) {
       msg += "，失敗 " + errors.length + " 筆";
     }
     batchProgress.textContent = msg;
-    batchBtn.disabled = false;
+    batchBtn.disabled = false; batchActive = false; csvInput.disabled = false; fileDrop.classList.remove("disabled");
   }).catch(function (err) {
     batchProgress.textContent = "ZIP 打包失敗：" + err.message;
-    batchBtn.disabled = false;
+    batchBtn.disabled = false; batchActive = false; csvInput.disabled = false; fileDrop.classList.remove("disabled");
   });
 }
