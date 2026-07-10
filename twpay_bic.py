@@ -56,7 +56,7 @@ def parse_source_bic_csv(content):
         raise BicUpdateError("BIC 來源編碼不符") from exc
 
 
-def read_bic_map(path):
+def read_bic_map(path=Path("data/BIC.csv")):
     try:
         with Path(path).open(newline="", encoding="utf-8-sig") as fh:
             reader = csv.DictReader(fh)
@@ -96,6 +96,7 @@ def _write_atomic(destination, mapping):
 
 def update_bic_dataset(http_get, destination: Path, url=CSV_URL):
     destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     lock = destination.with_suffix(destination.suffix + ".lock")
     try:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
