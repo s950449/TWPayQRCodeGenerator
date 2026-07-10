@@ -54,7 +54,13 @@ def publish_image(image, reservation: Reservation) -> Path:
         with tempfile.NamedTemporaryFile(dir=reservation.target.parent, suffix=".png", delete=False) as tmp:
             temp_name = tmp.name
         image.save(temp_name, format="PNG")
-        os.replace(temp_name, reservation.target)
+        # Hard-link creation is atomic and refuses to clobber a target that
+        # appeared after reservation (unlike os.replace).
+        try:
+            os.link(temp_name, reservation.target)
+        except FileExistsError as exc:
+            raise OutputPathError("輸出檔名已被占用") from exc
+        os.unlink(temp_name)
         temp_name = None
         return reservation.target
     finally:
