@@ -1,4 +1,4 @@
-import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm";
+import QRCode from "../vendor/qrcode-1.5.3.mjs";
 import { TWQRP_FEE_LIST, twqrpBillEncode, twqrpEncode } from "./twqrp.js";
 import { SavedAccountStore } from "./saved-accounts.js";
 import { LatestOperation } from "./operation-controller.js";
