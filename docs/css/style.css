@@ -234,6 +234,7 @@ header p {
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
+.file-drop.disabled { opacity: .6; pointer-events: none; }
 
 .file-drop:hover {
   border-color: #2563eb;
