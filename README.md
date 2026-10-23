@@ -11,6 +11,7 @@
     * [金融機構代碼對照來源](https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv)
 ## 所需環境
 ### Python Client
+* Python 3.11 或更新版本（Pillow 13 的最低需求）
 * 使用`pip install -r requirements.txt`或是`pipenv install`安裝所需的Library
 ### 靜態網頁
 * 使用一個Web Server或瀏覽器
