@@ -44,13 +44,17 @@ allowlist 以外的修改會拒絕更新；只以 fast-forward 更新，不 forc
 - Ruleset「Protect Main」已啟用於預設分支，沒有 bypass actor：禁止刪除 / force-push、
   要求簽章、要求 `verify` 通過且分支為最新、要求 PR 與 Code Owner review。
 - `github-pages` environment 只允許 `main`。
+- Allowed actions 為 `selected`：僅 **Allow actions created by GitHub**，無其他 pattern、
+  不允許 Marketplace verified creators。**不要選 local only**：本專案使用的
+  `actions/*` 都不是本 repository 的 local action，會讓所有 workflow `startup_failure`，
+  required check `verify` 也無法產生。`sha_pinning_required` 為 `false`，
+  commit 由 `actions.lock` 鎖定；若要開 SHA pinning，須先確認 Require lockfile 已啟用。
 - Dependabot security updates、secret scanning、push protection、
   private vulnerability reporting 已啟用。
 
 尚未完成：
 
-- `allowed_actions: all` 且 `sha_pinning_required: false`，應縮限為使用中的 `actions/*`；
-  Require lockfile 無法由 API 確認，須在後台確認並啟用。
+- Require lockfile 無法由 API 確認，須在後台確認並啟用。
 - PR rule 的 `required_approving_review_count` 為 `0`。單一維護者時，作者自己的 PR
   實際上不需他人核准即可合併（PR #24 即無 review 合併）；目前強制閘門只有 `verify` 與簽章。
 - Actions 建立 / approve PR 的開關仍啟用；配合上一點，未啟用 bot 資料 PR 前建議先關閉。
