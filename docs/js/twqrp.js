@@ -2,7 +2,7 @@
  * TWQRP 編碼邏輯（移植自 app.py offline_genstr）
  *
  * 轉帳格式：TWQRP://{BankID}NTTransfer/158/02/V1?D6={Account}&D5={BankID}&D10=901[&D1={Amount}00]&D9={Msg}
- * 繳費格式：TWQRP://{FeeName}/158/03/V1?{PartialString}&D1={Amount}00&D7={Account}
+ * 繳費格式：TWQRP://{FeeName}/158/03/V1?{PartialString}[&D1={Amount}00]&D7={Account}
  */
 
 export const TWQRP_AMOUNT_MAX = 9999999999999999n;
@@ -17,9 +17,8 @@ function text(value, field) {
   return result;
 }
 
-function amount(value, required) {
+function amount(value) {
   if (value == null || value === "") {
-    if (required) throw new TwqrpValidationError("繳費模式需輸入金額");
     return null;
   }
   const result = text(value, "金額");
@@ -83,7 +82,7 @@ export const TWQRP_FEE_LIST = [
  * 驗證並產生 TWQRP 繳費字串
  * @param {object} feeItem  - TWQRP_FEE_LIST 中的項目
  * @param {string} account  - 繳費帳號/單號
- * @param {string|number} rawAmount - 金額（必填）
+ * @param {string|number|null} rawAmount - 金額（選填）
  * @param {string} memo     - 備註（選填）
  * @returns {string} TWQRP 繳費編碼字串
  * @throws {Error} 驗證失敗時拋出錯誤
@@ -94,14 +93,14 @@ export function twqrpBillEncode(feeItem, account, rawAmount, rawMemo) {
   if (accountText !== accountText.trim() || !/^[A-Za-z0-9]{1,64}$/.test(accountText)) {
     throw new TwqrpValidationError("請輸入繳費帳號");
   }
-  const amountText = amount(rawAmount, true);
+  const amountText = amount(rawAmount);
   const memoText = memo(rawMemo);
 
   // 組合基本 TWQRP 繳費字串
   var uriString =
     "TWQRP://" + feeItem.feeName + "/158/03/V1?" +
     feeItem.partialString +
-    "&D1=" + amountText + "00" +
+    (amountText === null ? "" : "&D1=" + amountText + "00") +
     "&D7=" + accountText;
 
   // 附加備註
@@ -117,7 +116,7 @@ export function twqrpBillEncode(feeItem, account, rawAmount, rawMemo) {
       result = "https://paybill.sinopac.com/CreditCard/BarcodeQueryBill/" + accountText + "?" + encodeURIComponent(uriString);
       break;
     case "NHI":
-      result = "https://cloudicweb.nhi.gov.tw/nhiapp/PayBill/pay.aspx?billtype=02&billno=" + accountText + "&billamt=" + amountText + "?" + encodeURIComponent(uriString);
+      result = "https://cloudicweb.nhi.gov.tw/nhiapp/PayBill/pay.aspx?billtype=02&billno=" + accountText + (amountText === null ? "" : "&billamt=" + amountText) + "?" + encodeURIComponent(uriString);
       break;
     default:
       result = uriString;
@@ -143,7 +142,7 @@ export function validateTransfer({ bankId, account, amount: rawAmount, memo: raw
   if(!/^[0-9]{1,16}$/.test(a)) throw new TwqrpValidationError("帳號必須是 1 至 16 位數字");
   const rawAmountText=rawAmount == null ? rawAmount : String(rawAmount);
   if (rawAmountText && rawAmountText!==rawAmountText.trim()) throw new TwqrpValidationError("金額不可含前後空白");
-  return { bankId: b, account: a.padStart(16, "0"), amount: amount(rawAmount, false), memo: memo(rawMemo) };
+  return { bankId: b, account: a.padStart(16, "0"), amount: amount(rawAmount), memo: memo(rawMemo) };
 }
 
 export function encodeTransfer(input) {

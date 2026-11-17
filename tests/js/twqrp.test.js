@@ -36,6 +36,29 @@ test("keeps special bill URLs safe after validating an alphanumeric account", ()
   assert.throws(() => twqrpBillEncode(fee, "AB12& D1", "10", ""), TwqrpValidationError);
 });
 
+test("all bill types allow an omitted amount without encoding amount fields", () => {
+  for (const fee of TWQRP_FEE_LIST) {
+    for (const value of [null, undefined, ""]) {
+      const result = decodeURIComponent(twqrpBillEncode(fee, "12345678901", value, "hello"));
+      assert.ok(!result.includes("&D1="), fee.code);
+      assert.ok(!result.includes("&billamt="), fee.code);
+      assert.ok(!result.includes("null") && !result.includes("undefined"), fee.code);
+      assert.ok(result.endsWith("&D7=12345678901&D9=hello"), fee.code);
+    }
+  }
+});
+
+test("bill amounts still require a positive integer within the exact amount limit", () => {
+  for (const fee of TWQRP_FEE_LIST) {
+    for (const value of ["0", "-1", "1.5", "12abc", "10000000000000000"]) {
+      assert.throws(() => twqrpBillEncode(fee, "12345678901", value, ""), TwqrpValidationError);
+    }
+    const result = decodeURIComponent(twqrpBillEncode(fee, "12345678901", "9999999999999999", ""));
+    assert.ok(result.endsWith("&D1=999999999999999900&D7=12345678901"), fee.code);
+    if (fee.spec === "NHI") assert.ok(result.includes("&billamt=9999999999999999?"));
+  }
+});
+
 test("rejects unsafe bill account and payload fields", () => {
   const fee = TWQRP_FEE_LIST.find((item) => item.spec === "Water");
   assert.throws(() => twqrpBillEncode(fee, " AB12 ", "10", ""), TwqrpValidationError);

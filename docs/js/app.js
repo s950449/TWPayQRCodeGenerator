@@ -42,7 +42,6 @@ var feeSelect = document.getElementById("fee-select");
 var feeGroup = document.getElementById("fee-group");
 var feeHint = document.getElementById("fee-hint");
 var feeServiceFee = document.getElementById("fee-service-fee");
-var amountLabel = document.getElementById("amount-label");
 var modeTabs = document.querySelectorAll(".mode-tab");
 var transferOnlyEls = document.querySelectorAll(".transfer-only");
 var billOnlyEls = document.querySelectorAll(".bill-only");
@@ -203,16 +202,12 @@ modeTabs.forEach(function (tab) {
       transferOnlyEls.forEach(function (el) { el.classList.add("hidden"); });
       billOnlyEls.forEach(function (el) { el.classList.remove("hidden"); });
       bankSelect.removeAttribute("required");
-      amountInput.setAttribute("required", "");
-      amountLabel.innerHTML = '金額';
       accountInput.placeholder = "請輸入繳費帳號";
       saveAccountBtn.classList.add("hidden");
     } else {
       transferOnlyEls.forEach(function (el) { el.classList.remove("hidden"); });
       billOnlyEls.forEach(function (el) { el.classList.add("hidden"); });
       bankSelect.setAttribute("required", "");
-      amountInput.removeAttribute("required");
-      amountLabel.innerHTML = '金額 <span class="optional">（選填）</span>';
       accountInput.placeholder = "請輸入帳號";
       saveAccountBtn.classList.remove("hidden");
     }
