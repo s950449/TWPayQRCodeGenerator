@@ -35,16 +35,29 @@ allowlist 以外的修改會拒絕更新；只以 fast-forward 更新，不 forc
 
 本次程式修改**不會**自動修改 repository、organization 或 environment 設定。
 
-2026-11-17 唯讀檢查的遠端現況：
+2026-11-17 第二次唯讀檢查（PR #24 合併、首次 `deploy-pages` 成功後）的遠端現況：
 
-- 預設 workflow permissions 為 `write`，應改為唯讀。
-- `allowed_actions: all`，應縮限；Require lockfile 仍須在後台確認並啟用。
-- `main` 的 `protected` 為 `false`，且沒有 ruleset。
-- Pages 為舊的 branch 部署（`main` 的 `/docs`），尚未切換到 Actions。
-- `github-pages` environment 已只允許 `main`，沒有 required reviewer。
-- Actions 建立 / approve PR 的開關已啟用。
+已完成：
 
-**這些未完成前，不應宣稱整個 repository 的部署與合併已有強制安全閘門。**
+- Pages source 已改為 **GitHub Actions**（`build_type: workflow`）；網站內部文件不會發布。
+- 預設 workflow permissions 為 `read`；外部貢獻者的 workflow 一律需核准。
+- Ruleset「Protect Main」已啟用於預設分支，沒有 bypass actor：禁止刪除 / force-push、
+  要求簽章、要求 `verify` 通過且分支為最新、要求 PR 與 Code Owner review。
+- `github-pages` environment 只允許 `main`。
+- Dependabot security updates、secret scanning、push protection、
+  private vulnerability reporting 已啟用。
+
+尚未完成：
+
+- `allowed_actions: all` 且 `sha_pinning_required: false`，應縮限為使用中的 `actions/*`；
+  Require lockfile 無法由 API 確認，須在後台確認並啟用。
+- PR rule 的 `required_approving_review_count` 為 `0`。單一維護者時，作者自己的 PR
+  實際上不需他人核准即可合併（PR #24 即無 review 合併）；目前強制閘門只有 `verify` 與簽章。
+- Actions 建立 / approve PR 的開關仍啟用；配合上一點，未啟用 bot 資料 PR 前建議先關閉。
+- `github-pages` environment 允許管理員 bypass；合併後不會自動刪除分支。
+- `update-bic` 尚未實際執行，GitHub runner 能否下載財金資料仍未驗證。
+
+**「尚未完成」各項處理前，不應宣稱合併已有強制的人工審核閘門。**
 
 1. **Settings → Pages**
    - Source 設為 **GitHub Actions**。
