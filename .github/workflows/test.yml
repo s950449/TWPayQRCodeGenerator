@@ -3,21 +3,44 @@ name: test
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions: {}
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: "22"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -r requirements.txt pip-audit
+          package-manager-cache: false
+      - name: Verify workflow dependency lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://github.com/github/gh-actions-lock/releases/download/v0.4.1/linux-amd64 \
+            --output "$RUNNER_TEMP/gh-actions-lock"
+          echo "39deb2fe714dbf74b073d8245fc7f3d50cd0eee18d5c0900e9e849ae933ae17e  $RUNNER_TEMP/gh-actions-lock" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/gh-actions-lock"
+          "$RUNNER_TEMP/gh-actions-lock" --verify
+      - name: Install hash-locked wheels (no source builds)
+        run: |
+          python scripts/check_python_lock.py
+          python -m pip install --require-hashes --only-binary=:all: --index-url https://pypi.org/simple -r requirements-ci.lock
       - run: python -m unittest discover -s tests/python -v
+      - run: python scripts/bic_assets.py --check
       - run: npm run test:js
       - run: npm run verify:vendor
-      - run: pip-audit -r requirements.txt
+      - run: pip-audit --disable-pip --no-deps -r requirements-ci.lock

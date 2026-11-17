@@ -1,0 +1,12 @@
+# Effective only when the main ruleset requires Code Owner approval.
+# The owner cannot approve their own PR; see docs/deployment-security.md.
+# Default owner for every path (package.json, root configs, new files).
+* @s950449
+/.github/ @s950449
+/scripts/ @s950449
+/requirements* @s950449
+/twpay_bic.py @s950449
+/update_bic.py @s950449
+/data/BIC.csv @s950449
+/docs/ @s950449
+/tests/ @s950449

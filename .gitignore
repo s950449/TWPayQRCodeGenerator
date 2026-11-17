@@ -3,6 +3,7 @@
 .worktrees/
 .superpowers/
 __pycache__/
+mydata/
 *.py[cod]
 *.png.lock
 *.tmp.png
