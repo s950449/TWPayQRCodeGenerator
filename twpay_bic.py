@@ -2,17 +2,66 @@
 import csv
 import io
 import os
+import re
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 CSV_URL = "https://www.fisc.com.tw/TC/OPENDATA/Comm1_MEMBER.csv"
 MAX_BIC_DOWNLOAD_BYTES = 5 * 1024 * 1024
 SOURCE_HEADERS = ("業務別", "銀行代號/BIC/總機構代碼", "金融機構名稱")
+SOURCE_HEADER_VARIANTS = (
+    SOURCE_HEADERS,
+    ("業務別", "銀行代號/BIC", "金融機構名稱"),
+)
 SERVICE = "跨行自動化服務機器業務(金融卡)"
 
 
 class BicUpdateError(ValueError):
     pass
+
+
+def _validate_record(bic, name):
+    if not re.fullmatch(r"[0-9]{3}", bic) or not name or len(name) > 128:
+        raise BicUpdateError("BIC 檔案資料不符")
+    if any(ord(c) < 32 or ord(c) == 127 for c in name):
+        raise BicUpdateError("BIC 名稱含控制字元")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+class _Response:
+    def __init__(self, response):
+        self.response = response
+        self.status_code = response.status
+        self.headers = response.headers
+
+    def iter_content(self, chunk_size):
+        while chunk := self.response.read(chunk_size):
+            yield chunk
+
+    def close(self):
+        self.response.close()
+
+
+def stdlib_http_get(url, *, timeout, allow_redirects, stream):
+    """Dependency-free downloader; redirects stay disabled, including across hosts."""
+    if allow_redirects or not stream or url != CSV_URL:
+        raise BicUpdateError("不允許的 BIC 下載設定")
+    opener = urllib.request.build_opener(_NoRedirect())
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "TWPayQRCodeGenerator-BIC-Updater/1.0",
+        "Accept": "text/csv",
+    })
+    try:
+        return _Response(opener.open(request, timeout=timeout))
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        raise BicUpdateError(f"BIC 下載失敗 (HTTP {exc.code})") from exc
 
 
 def _read_limited(response):
@@ -40,15 +89,18 @@ def parse_source_bic_csv(content):
     try:
         text = bytes(content).decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text, newline=""))
-        if tuple(reader.fieldnames or ()) != SOURCE_HEADERS:
+        headers = tuple(reader.fieldnames or ())
+        if headers not in SOURCE_HEADER_VARIANTS:
             raise BicUpdateError("BIC 來源欄位不符")
         result = {}
         for row in reader:
             if row.get("業務別") != SERVICE:
                 continue
-            bic, name = (row.get(SOURCE_HEADERS[1], "") or "").strip(), (row.get(SOURCE_HEADERS[2], "") or "").strip()
-            if len(bic) == 3 and bic.isdigit() and name:
-                result[bic] = name
+            bic, name = (row.get(headers[1], "") or "").strip(), (row.get(headers[2], "") or "").strip()
+            _validate_record(bic, name)
+            if bic in result:
+                raise BicUpdateError("BIC 來源代碼重複")
+            result[bic] = name
         if not result:
             raise BicUpdateError("BIC 來源沒有有效資料")
         return result
@@ -65,8 +117,9 @@ def read_bic_map(path=Path("data/BIC.csv")):
             result = {}
             for row in reader:
                 bic, name = (row.get("BIC", "") or "").strip(), (row.get("Name", "") or "").strip()
-                if len(bic) != 3 or not bic.isdigit() or not name:
-                    raise BicUpdateError("BIC 檔案資料不符")
+                _validate_record(bic, name)
+                if bic in result:
+                    raise BicUpdateError("BIC 檔案代碼重複")
                 result[bic] = name
             if not result:
                 raise BicUpdateError("BIC 檔案沒有資料")

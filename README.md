@@ -28,7 +28,17 @@
 * 輸入格式請參考`sample.csv`
 ## Tips
 * 更新金融機構代碼 
-    * 執行 `python update_bic.py` ， 將會從財金公司下載最新的CSV檔案並轉換成本產生器可用格式
+    * 建議執行 `python scripts/bic_assets.py --refresh`，下載財金公司 CSV 並同步 Python、網頁資料及資料 manifest。
+    * `python update_bic.py` 僅更新 `data/BIC.csv`，執行後須再跑 `python scripts/bic_assets.py`。
+
+## 自動部署與資料更新
+
+合併至 `main` 後，GitHub Actions 會先驗證再部署 `docs/` 到 GitHub Pages。
+每週一排程下載財金資料，有變更時只建立／更新資料 PR，人工審閱合併後才發布。
+Actions（含間接依賴）由官方 `actions.lock` 鎖定；PR 驗證沒有寫入權限或 secrets。
+
+**啟用前必須完成 Pages、Require lockfile、main ruleset 與 environment 保護設定。**
+詳見 [部署與安全設定](docs/deployment-security.md)，包含權限矩陣、bot PR 的 CI 操作及剩餘風險。
 
 ## 瀏覽器版資料與隱私
 
@@ -41,6 +51,8 @@
 ```bash
 npm run test:js
 npm run verify:vendor
+python3 scripts/bic_assets.py --check
+python3 scripts/check_python_lock.py
 python3 -m unittest discover -s tests/python -v
 python3 app.py -h
 python3 update_bic.py -h

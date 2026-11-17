@@ -1,0 +1,3 @@
+# Runtime pins plus the audit tool. CI installs only hashed wheels from the lock.
+-r requirements.txt
+pip-audit==2.10.1

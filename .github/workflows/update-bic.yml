@@ -1,0 +1,67 @@
+name: update-bic
+
+on:
+  schedule:
+    - cron: "23 1 * * 1" # Monday 09:23 Asia/Taipei (best-effort schedule)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: update-bic
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && github.repository == 's950449/TWPayQRCodeGenerator'
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.11"
+      # No pip/npm install, secrets, or write token while processing external CSV.
+      - name: Download, validate and generate candidate data
+        run: python scripts/bic_assets.py --refresh --bundle "$RUNNER_TEMP/bic-bundle"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: bic-candidate
+          path: |
+            ${{ runner.temp }}/bic-bundle/data/BIC.csv
+            ${{ runner.temp }}/bic-bundle/docs/js/bic-data.js
+            ${{ runner.temp }}/bic-bundle/docs/data/bic-manifest.json
+          if-no-files-found: error
+          retention-days: 1
+
+  propose:
+    needs: prepare
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: bic-candidate
+          path: ${{ runner.temp }}/bic-candidate
+      # Script comes from this run's main SHA, NEVER from a PR or the bot branch.
+      # The artifact is parsed as bounded data, not sourced/imported/executed.
+      - name: Revalidate allowlisted files and open a data-only PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.sha }}
+          BUNDLE_DIR: ${{ runner.temp }}/bic-candidate
+        run: python scripts/publish_bic_update.py
